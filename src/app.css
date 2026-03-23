@@ -446,7 +446,12 @@ input::placeholder {
 	color: var(--text-disabled);
 }
 
-/* Scrollbar - minimal style */
+/* Scrollbar — consistent everywhere */
+* {
+	scrollbar-color: var(--border-focus) transparent;
+	scrollbar-width: thin;
+}
+
 ::-webkit-scrollbar {
 	width: 6px;
 	height: 6px;
