@@ -126,7 +126,7 @@
 		}
 
 		const encoded = await compressAndEncode(pythonCode);
-		window.open(`${CODEGEN_URL}#code=${encoded}`, '_blank');
+		window.open(`${CODEGEN_URL}?code=${encoded}`, '_blank');
 		flashSaveButton('codegen');
 	}
 
