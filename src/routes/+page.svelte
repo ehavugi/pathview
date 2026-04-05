@@ -55,6 +55,35 @@
 	import Tooltip, { tooltip } from '$lib/components/Tooltip.svelte';
 	import { isInputFocused } from '$lib/utils/focus';
 
+	// Theme toggle button ref for radial transition origin
+	let themeToggleBtn: HTMLButtonElement;
+
+	function toggleThemeWithTransition(e?: MouseEvent) {
+		const apply = () => themeStore.toggle();
+
+		if (!document.startViewTransition) { apply(); return; }
+
+		let x: number, y: number;
+		if (e) {
+			x = e.clientX; y = e.clientY;
+		} else if (themeToggleBtn) {
+			const rect = themeToggleBtn.getBoundingClientRect();
+			x = rect.left + rect.width / 2;
+			y = rect.top + rect.height / 2;
+		} else {
+			apply(); return;
+		}
+
+		const maxRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+		const transition = document.startViewTransition(apply);
+		transition.ready.then(() => {
+			document.documentElement.animate(
+				{ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${maxRadius}px at ${x}px ${y}px)`] },
+				{ duration: 500, easing: 'ease-out', pseudoElement: '::view-transition-new(root)' }
+			);
+		});
+	}
+
 	// Track mouse position for paste operations
 	let mousePosition = $state({ x: 0, y: 0 });
 
@@ -731,7 +760,7 @@
 					return;
 				case 't':
 					event.preventDefault();
-					themeStore.toggle();
+					toggleThemeWithTransition();
 					return;
 				case '+':
 				case '=':
@@ -1197,7 +1226,8 @@
 			</button>
 			<button
 				class="toggle-btn"
-				onclick={() => themeStore.toggle()}
+				bind:this={themeToggleBtn}
+				onclick={(e) => toggleThemeWithTransition(e)}
 				use:tooltip={{ text: currentTheme === 'dark' ? 'Light mode' : 'Dark mode', shortcut: "T", position: "right" }}
 				aria-label="Toggle theme"
 			>
