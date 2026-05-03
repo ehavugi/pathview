@@ -605,7 +605,6 @@
 								/>
 								<span>Block</span>
 								<span>Description</span>
-								<span>Category</span>
 								<span></span>
 							</div>
 							{#each blockSelections as sel (sel.className)}
@@ -622,11 +621,6 @@
 										/>
 										<span class="block-name">{sel.className}</span>
 										<span class="block-desc">{block.description.split('\n')[0]}</span>
-										<input
-											class="cat-input"
-											bind:value={categoryEdits[sel.className]}
-											onblur={() => applyCategoryEdit(sel.className)}
-										/>
 										<button
 											class="row-expand"
 											onclick={() => (activeOverrideRow = open ? null : sel.className)}
@@ -643,6 +637,14 @@
 													value={ov.name ?? ''}
 													oninput={(e) => setOverride(sel.className, 'name', (e.target as HTMLInputElement).value)}
 													placeholder={sel.className}
+												/>
+											</label>
+											<label>
+												<span>Category</span>
+												<input
+													bind:value={categoryEdits[sel.className]}
+													onblur={() => applyCategoryEdit(sel.className)}
+													placeholder={defaultCategory ?? resolvedDisplayName}
 												/>
 											</label>
 											<label>
@@ -692,7 +694,6 @@
 										<span class="block-desc">
 											{discoveredEvents.find((e) => e.className === sel.className)?.description.split('\n')[0] ?? ''}
 										</span>
-										<span></span>
 										<span></span>
 									</div>
 								{/each}
@@ -1069,7 +1070,7 @@
 
 	.block-row {
 		display: grid;
-		grid-template-columns: 28px minmax(90px, 130px) 1fr 110px 24px;
+		grid-template-columns: 28px minmax(90px, 160px) 1fr 24px;
 		gap: var(--space-sm);
 		align-items: center;
 		padding: var(--space-xs) var(--space-sm);
@@ -1089,13 +1090,14 @@
 	.block-row.block-head {
 		background: var(--surface-raised);
 		color: var(--text-muted);
-		font-size: var(--font-sm);
+		font-size: var(--font-base);
+		padding: var(--space-sm);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
 
 	.block-row.event-row {
-		grid-template-columns: 28px minmax(90px, 130px) 1fr 110px 24px;
+		grid-template-columns: 28px minmax(90px, 160px) 1fr 24px;
 	}
 
 	.block-name {
@@ -1111,11 +1113,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-
-	.cat-input {
-		font-size: var(--font-base);
-		padding: var(--space-xs) var(--space-sm);
 	}
 
 	.row-expand {
