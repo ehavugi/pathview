@@ -15,6 +15,8 @@
 	import NodeLibrary from '$lib/components/panels/NodeLibrary.svelte';
 	import EventsPanel from '$lib/components/panels/EventsPanel.svelte';
 	import SubsystemTree from '$lib/components/panels/SubsystemTree.svelte';
+	import ToolboxManagerDialog from '$lib/components/dialogs/ToolboxManagerDialog.svelte';
+	import { bootstrapToolboxes, type ToolboxConfig } from '$lib/toolbox';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import { buildContextMenuItems, type ContextMenuCallbacks } from '$lib/components/contextMenuBuilders';
 	import ExportDialog from '$lib/components/dialogs/ExportDialog.svelte';
@@ -406,6 +408,13 @@
 
 	let exportDialogOpen = $state(false);
 	let showKeyboardShortcuts = $state(false);
+	let toolboxManagerOpen = $state(false);
+	let toolboxManagerEditing = $state<ToolboxConfig | null>(null);
+
+	function openToolboxManager(editing: ToolboxConfig | null = null) {
+		toolboxManagerEditing = editing;
+		toolboxManagerOpen = true;
+	}
 	let showSearchDialog = $state(false);
 	let showPlotOptionsDialog = $state(false);
 
@@ -495,6 +504,17 @@
 	onMount(() => {
 		// Auto-detect same-origin Flask backend (pip package mode), then check URL params
 		autoDetectBackend().then(() => initBackendFromUrl());
+
+		// Re-install runtime toolboxes from previous sessions and seed any
+		// preloaded catalog entries on first launch. Internally short-circuits
+		// when there's no work to do, so we can call it unconditionally.
+		(async () => {
+			try {
+				await bootstrapToolboxes();
+			} catch (e) {
+				console.error('[toolbox bootstrap]', e);
+			}
+		})();
 
 		// Subscribe to stores (with cleanup)
 		const unsubPinnedPreviews = pinnedPreviewsStore.subscribe((pinned) => {
@@ -1312,6 +1332,16 @@
 			onClose={() => showNodeLibrary = false}
 			onWidthChange={(w) => nodeLibraryWidth = Math.min(500, Math.max(280, w))}
 		>
+			{#snippet actions()}
+				<button
+					class="icon-btn ghost"
+					onclick={() => openToolboxManager()}
+					use:tooltip={'Toolboxes'}
+					aria-label="Toolboxes"
+				>
+					<Icon name="box" size={16} />
+				</button>
+			{/snippet}
 			<NodeLibrary
 				bind:this={nodeLibraryRef}
 				onAddNode={handleAddNode}
@@ -1471,6 +1501,13 @@
 
 	<!-- Keyboard Shortcuts Dialog -->
 	<KeyboardShortcutsDialog open={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />
+
+	<!-- Toolbox Manager -->
+	<ToolboxManagerDialog
+		open={toolboxManagerOpen}
+		editing={toolboxManagerEditing}
+		onClose={() => { toolboxManagerOpen = false; toolboxManagerEditing = null; }}
+	/>
 	<SearchDialog open={showSearchDialog} onClose={() => showSearchDialog = false} />
 	<PlotOptionsDialog open={showPlotOptionsDialog} onClose={() => showPlotOptionsDialog = false} traces={resultTraces} />
 

@@ -5,6 +5,7 @@
 import type { NodeInstance, Connection, Annotation } from './nodes';
 import type { EventInstance } from './events';
 import type { SimulationSettings } from './simulation';
+import type { ToolboxSource } from '$lib/toolbox/types';
 
 /** File metadata */
 export interface FileMetadata {
@@ -12,6 +13,22 @@ export interface FileMetadata {
 	modified: string;
 	name: string;
 	description?: string;
+}
+
+/**
+ * Minimal install descriptor embedded in saved files so a model can declare
+ * which runtime toolboxes its blocks come from. The loader matches these
+ * against the current toolbox store and prompts to install any missing ones.
+ *
+ * Optional for backward compatibility: files saved before this field
+ * existed simply have no `requiredToolboxes` and load as before.
+ */
+export interface ToolboxRequirement {
+	id: string;
+	displayName: string;
+	source: ToolboxSource;
+	importPath: string;
+	eventsImportPath?: string;
 }
 
 /** Shared graph content structure (used by GraphFile and ModelContent) */
@@ -26,6 +43,8 @@ export interface GraphContent {
 		code: string;
 	};
 	simulationSettings: SimulationSettings;
+	/** Optional list of runtime toolboxes this file needs to render correctly. */
+	requiredToolboxes?: ToolboxRequirement[];
 }
 
 /** Graph file format */

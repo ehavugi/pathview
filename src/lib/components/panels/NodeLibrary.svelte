@@ -1,16 +1,20 @@
 <script lang="ts">
-	import { nodeRegistry, blockConfig, type NodeCategory, type NodeTypeDefinition } from '$lib/nodes';
+	import { nodeRegistry, blockConfig, registryVersion, type NodeCategory, type NodeTypeDefinition } from '$lib/nodes';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import NodePreview from '$lib/components/nodes/NodePreview.svelte';
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { tooltip } from '$lib/components/Tooltip.svelte';
-
 	interface Props {
 		onAddNode?: (type: string) => void;
 		focusSearch?: boolean;
 	}
 
 	let { onAddNode, focusSearch = false }: Props = $props();
+
+	// Registry change counter — read it inside derived blocks so they re-run
+	// whenever a toolbox install/uninstall mutates the registry.
+	let registryTick = $state(0);
+	registryVersion.subscribe((v) => (registryTick = v));
 
 	// Search query
 	let searchQuery = $state('');
@@ -38,18 +42,16 @@
 		}
 	}
 
-	// Category order derived from blockConfig (source of truth)
-	// Add Subsystem at end since it's registered separately
-	const categoryOrder: NodeCategory[] = [...Object.keys(blockConfig) as NodeCategory[], 'Subsystem'];
+	// Built-in category order from blockConfig + Subsystem (registered separately).
+	// Runtime-added categories are appended in registration order after these.
+	const builtInCategoryOrder: NodeCategory[] = [...(Object.keys(blockConfig) as NodeCategory[]), 'Subsystem'];
 
-	// Get all node types
-	const nodeTypes = nodeRegistry.getAll();
-
-	// Filter nodes based on search and context
-	// Interface is NEVER shown in library - it's auto-created inside subsystems
+	// Filter nodes based on search and context. Read registryTick so the
+	// derived re-runs whenever the registry changes (toolbox install/uninstall).
 	const filteredNodes = $derived(() => {
-		// Always hide Interface block - it's auto-created inside subsystems
-		let nodes = nodeTypes.filter((node) => node.type !== NODE_TYPES.INTERFACE);
+		// Touch the tick to register the dependency
+		void registryTick;
+		let nodes = nodeRegistry.getAll().filter((node) => node.type !== NODE_TYPES.INTERFACE);
 
 		if (!searchQuery.trim()) return nodes;
 		const query = searchQuery.toLowerCase();
@@ -61,22 +63,21 @@
 		);
 	});
 
-	// Group by category (ordered)
+	// Group by category (ordered). Built-in categories first, then any
+	// runtime-introduced categories appended in alphabetical order.
 	const groupedNodes = $derived(() => {
 		const groups = new Map<NodeCategory, NodeTypeDefinition[]>();
 		for (const node of filteredNodes()) {
-			if (!groups.has(node.category)) {
-				groups.set(node.category, []);
-			}
+			if (!groups.has(node.category)) groups.set(node.category, []);
 			groups.get(node.category)!.push(node);
 		}
-		// Return in order
 		const ordered = new Map<NodeCategory, NodeTypeDefinition[]>();
-		for (const cat of categoryOrder) {
-			if (groups.has(cat)) {
-				ordered.set(cat, groups.get(cat)!);
-			}
+		for (const cat of builtInCategoryOrder) {
+			if (groups.has(cat)) ordered.set(cat, groups.get(cat)!);
 		}
+		const remaining = Array.from(groups.keys()).filter((c) => !builtInCategoryOrder.includes(c));
+		remaining.sort((a, b) => a.localeCompare(b));
+		for (const cat of remaining) ordered.set(cat, groups.get(cat)!);
 		return ordered;
 	});
 

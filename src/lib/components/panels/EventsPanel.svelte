@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { eventRegistry } from '$lib/events/registry';
+	import { eventRegistry, eventRegistryVersion } from '$lib/events/registry';
 	import type { EventTypeDefinition, EventInstance } from '$lib/events/types';
 	import { eventStore } from '$lib/stores/events';
 	import { graphStore } from '$lib/stores/graph';
@@ -14,8 +14,13 @@
 
 	let { onAddEvent }: Props = $props();
 
-	// Get all event types
-	const eventTypes = eventRegistry.getAll();
+	// Re-derive event types whenever the registry changes (runtime install/uninstall)
+	let registryTick = $state(0);
+	eventRegistryVersion.subscribe((v) => (registryTick = v));
+	const eventTypes = $derived.by(() => {
+		void registryTick;
+		return eventRegistry.getAll();
+	});
 
 	// Track if at root level
 	let isAtRoot = $state(true);

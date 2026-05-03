@@ -20,6 +20,16 @@ import { codeContextStore } from '$lib/stores/codeContext';
 import { consoleStore } from '$lib/stores/console';
 import { historyStore } from '$lib/stores/history';
 import { simulationState, resetSimulation } from '$lib/pyodide/bridge';
+import {
+	collectRequiredToolboxes,
+	findMissingRequirements,
+	performInstall,
+	discoverToolbox,
+	registerToolbox,
+	upsertToolbox,
+	getCatalogEntry
+} from '$lib/toolbox';
+import type { ToolboxRequirement } from '$lib/types/schema';
 import { requestAssemblyAnimation } from '$lib/animation/assemblyAnimation';
 import { downloadJson } from '$lib/utils/download';
 import { confirmationStore } from '$lib/stores/confirmation';
@@ -86,6 +96,8 @@ export function createGraphFile(name?: string): GraphFile {
 		Object.entries(settings).map(([k, v]) => [k, v === '' ? null : v])
 	) as SimulationSettings;
 
+	const requiredToolboxes = collectRequiredToolboxes(nodes);
+
 	return {
 		version: GRAPH_FILE_VERSION,
 		metadata: {
@@ -102,7 +114,8 @@ export function createGraphFile(name?: string): GraphFile {
 		codeContext: {
 			code
 		},
-		simulationSettings: cleanedSettings
+		simulationSettings: cleanedSettings,
+		...(requiredToolboxes.length > 0 ? { requiredToolboxes } : {})
 	};
 }
 
@@ -149,6 +162,67 @@ function migrateGraphFile(file: GraphFile): GraphFile {
 }
 
 /**
+ * Install missing runtime toolboxes referenced by a file's
+ * `requiredToolboxes`. Asks the user once, then installs in order.
+ *
+ * Best-effort: a failed install logs to console and lets the load proceed.
+ * Unknown blocks then render as placeholders.
+ */
+async function installRequiredToolboxes(reqs: ToolboxRequirement[]): Promise<void> {
+	const missing = findMissingRequirements(reqs);
+	if (missing.length === 0) return;
+
+	const list = missing.map((r) => `· ${r.displayName}`).join('\n');
+	const ok = await confirmationStore.show({
+		title: 'Install required toolboxes?',
+		message: `This file uses ${missing.length} toolbox${missing.length === 1 ? '' : 'es'} that ${missing.length === 1 ? 'is' : 'are'} not installed:\n\n${list}\n\nInstall now?`,
+		confirmText: 'Install',
+		cancelText: 'Skip'
+	});
+	if (!ok) {
+		consoleStore.warn(
+			`[toolbox] skipped install of: ${missing.map((r) => r.id).join(', ')}. Affected blocks will render as placeholders.`
+		);
+		return;
+	}
+
+	for (const req of missing) {
+		try {
+			const installResult = await performInstall(req.source, req.importPath || undefined);
+			const updated: ToolboxRequirement = {
+				...req,
+				importPath: installResult.importPath
+			};
+			const discovered = await discoverToolbox({
+				importPath: updated.importPath,
+				eventsImportPath: updated.eventsImportPath
+			});
+			const catalog = getCatalogEntry(req.id);
+			const config = {
+				id: req.id,
+				displayName: req.displayName,
+				source: req.source,
+				importPath: updated.importPath,
+				eventsImportPath: updated.eventsImportPath,
+				blocks: discovered.blocks.map((b) => ({ className: b.className, enabled: true })),
+				events: discovered.events.map((e) => ({ className: e.className, enabled: true }))
+			};
+			registerToolbox(config, {
+				blocks: discovered.blocks,
+				events: discovered.events,
+				defaultCategory: catalog?.defaultCategory,
+				categoryByClass: catalog?.categoryByClass
+			});
+			upsertToolbox(config);
+			consoleStore.info(`[toolbox] installed ${req.displayName}`);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			consoleStore.error(`[toolbox] failed to install ${req.displayName}: ${msg}`);
+		}
+	}
+}
+
+/**
  * Load a GraphFile into the application state
  */
 export async function loadGraphFile(file: GraphFile): Promise<void> {
@@ -161,6 +235,12 @@ export async function loadGraphFile(file: GraphFile): Promise<void> {
 
 	// Reset simulation state (stops running simulation, clears results and Python state)
 	resetSimulation(); // Fire and forget - synchronous part stops immediately
+
+	// Install any runtime toolboxes the file declared as required. Files
+	// saved before this field existed simply skip this step.
+	if (file.requiredToolboxes && file.requiredToolboxes.length > 0) {
+		await installRequiredToolboxes(file.requiredToolboxes);
+	}
 
 	// Clear previous state and wait for UI to update
 	// This ensures FlowCanvas sees empty state before new data arrives
@@ -175,6 +255,16 @@ export async function loadGraphFile(file: GraphFile): Promise<void> {
 		file.graph?.connections || [],
 		file.graph?.annotations || []
 	);
+
+	// Surface any block types that ended up unregistered after the install
+	// step (either because the user skipped install, or because the file
+	// has no requiredToolboxes block list — old files / hand-edited files).
+	const unknownTypes = validateNodeTypes(file.graph?.nodes || []);
+	if (unknownTypes.length > 0) {
+		consoleStore.warn(
+			`[toolbox] unknown block types in this file: ${unknownTypes.join(', ')}. They will render as placeholders.`
+		);
+	}
 
 	// Load events
 	if (file.events && file.events.length > 0) {

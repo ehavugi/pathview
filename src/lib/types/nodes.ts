@@ -39,16 +39,11 @@ export interface ParamDefinition {
 	options?: string[]; // For enum-like strings
 }
 
-/** Node type category */
-export type NodeCategory =
-	| 'Sources'
-	| 'Dynamic'
-	| 'Algebraic'
-	| 'Logic'
-	| 'Mixed'
-	| 'Recording'
-	| 'Subsystem'
-	| 'Chemical';
+/**
+ * Node type category. Open-ended string so runtime-installed toolboxes can
+ * introduce new categories without source edits.
+ */
+export type NodeCategory = string;
 
 /** Node shape override (defaults based on category if not specified) */
 export type NodeShape = 'pill' | 'rect' | 'circle' | 'diamond';

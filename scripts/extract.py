@@ -24,117 +24,20 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
-# Optional docutils for RST to HTML conversion
-try:
-    from docutils.core import publish_parts
-    HAS_DOCUTILS = True
-except ImportError:
-    HAS_DOCUTILS = False
-    print("Warning: docutils not installed, docstrings will not be converted to HTML")
-
-
-# =============================================================================
-# Shared Utilities
-# =============================================================================
-
-def rst_to_html(rst_text: str) -> str:
-    """Convert RST docstring to HTML, preserving LaTeX math for KaTeX rendering."""
-    if not rst_text or not HAS_DOCUTILS:
-        return ""
-
-    # Clean the docstring - removes common leading whitespace from indented docstrings
-    cleaned = inspect.cleandoc(rst_text)
-
-    try:
-        parts = publish_parts(
-            cleaned,
-            writer_name="html",
-            settings_overrides={
-                "report_level": 5,
-                "halt_level": 5,
-                "initial_header_level": 3,
-                "math_output": "MathJax",
-            }
-        )
-        return parts["body"]
-    except Exception as e:
-        print(f"Warning: Failed to convert docstring to HTML: {e}")
-        return ""
-
-
-def extract_first_line(docstring: str) -> str:
-    """Extract first line/sentence from docstring as description."""
-    if not docstring:
-        return ""
-
-    lines = docstring.strip().split("\n")
-    first_line = ""
-    for line in lines:
-        stripped = line.strip()
-        if stripped:
-            first_line = stripped
-            break
-
-    if ". " in first_line:
-        first_line = first_line.split(". ")[0] + "."
-
-    return first_line
-
-
-def extract_param_description(docstring: str, param_name: str) -> str:
-    """Extract parameter description from docstring (RST format)."""
-    if not docstring:
-        return ""
-
-    pattern = rf"{param_name}\s*:\s*[^\n]*\n\s+(.+?)(?=\n\s*\w+\s*:|\n\n|$)"
-    match = re.search(pattern, docstring, re.DOTALL)
-    if match:
-        desc = match.group(1).strip()
-        desc = re.sub(r"\s+", " ", desc)
-        return desc
-
-    return ""
-
-
-def infer_param_type(value: Any, param_name: str = "") -> str:
-    """Infer parameter type from default value."""
-    if param_name.startswith('func_') or param_name.startswith('func'):
-        return "callable"
-    if callable(value) and not isinstance(value, type):
-        return "callable"
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, int):
-        return "integer"
-    if isinstance(value, float):
-        return "number"
-    if isinstance(value, str):
-        return "string"
-    if isinstance(value, (list, tuple)):
-        return "array"
-    if value is None:
-        return "any"
-    return "any"
-
-
-def format_default(value: Any) -> str | None:
-    """Format default value for TypeScript."""
-    if value is None:
-        return None
-    if callable(value) and not isinstance(value, type):
-        return None
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return repr(value)
-    if isinstance(value, str):
-        return f'"{value}"'
-    if isinstance(value, (list, tuple)):
-        return json.dumps(list(value))
-    if isinstance(value, type):
-        return f'"{value.__name__}"'
-    return repr(value)
+# Single source of truth for block/event introspection — also inlined into
+# the runtime toolbox installer in src/lib/toolbox/python.ts via Vite ?raw.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pathview_introspect import (  # noqa: E402
+    rst_to_html,
+    first_line as extract_first_line,
+    param_desc as extract_param_description,
+    infer_type as infer_param_type,
+    format_default,
+    process_port_labels,
+    extract_block,
+    extract_event,
+    extract_params_from_signature,
+)
 
 
 def format_default_py(value: Any) -> str | None:
