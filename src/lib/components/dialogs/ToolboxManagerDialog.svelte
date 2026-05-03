@@ -546,13 +546,16 @@
 				{:else if step === 'install'}
 					<div class="install">
 						{#if installStatus === 'error'}
-							<div class="error">
-								<div class="error-title">Installation failed</div>
-								<pre>{installError}</pre>
-								<div class="step-actions">
-									<button onclick={() => (step = 'source')}>Back</button>
-									<button onclick={runInstallAndDiscover}>Retry</button>
-								</div>
+							<div class="install-log">
+								{#each installError.split('\n') as line}
+									<div class="log-entry error">
+										<span class="log-message">{line}</span>
+									</div>
+								{/each}
+							</div>
+							<div class="step-actions">
+								<button onclick={() => (step = 'source')}>Back</button>
+								<button onclick={runInstallAndDiscover}>Retry</button>
 							</div>
 						{:else}
 							<div class="spinner-row">
@@ -986,27 +989,37 @@
 		}
 	}
 
-	.error {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-sm);
+	/* Install error log — same look as the simulation Console panel */
+	.install-log {
+		max-height: 320px;
+		overflow-y: auto;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
 	}
 
-	.error-title {
-		color: var(--error);
-		font-weight: 600;
-		font-size: var(--font-md);
-	}
-
-	.error pre {
-		margin: 0;
-		padding: var(--space-sm) var(--space-md);
-		background: var(--surface-raised);
-		border: 1px solid var(--error-bg);
-		border-radius: var(--radius-sm);
+	.log-entry,
+	.log-message {
 		font-family: var(--font-mono);
-		font-size: var(--font-base);
-		color: var(--text-muted);
+		font-size: 11px;
+		line-height: 1.6;
+	}
+
+	.log-entry {
+		padding: 2px var(--space-md);
+		border-bottom: 1px solid var(--border);
+	}
+
+	.log-entry:last-child {
+		border-bottom: none;
+	}
+
+	.log-entry.error {
+		color: var(--error);
+		background: var(--error-bg);
+	}
+
+	.log-message {
 		white-space: pre-wrap;
 		word-break: break-word;
 	}
