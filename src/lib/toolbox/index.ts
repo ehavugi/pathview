@@ -30,6 +30,8 @@ export {
 	uninstallToolbox
 } from './register';
 
-export { TOOLBOX_CATALOG, type CatalogEntry } from './catalog';
+export { TOOLBOX_CATALOG, getCatalogEntry, type CatalogEntry } from './catalog';
 
 export { bootstrapToolboxes } from './bootstrap';
+
+export { collectRequiredToolboxes, findMissingRequirements } from './dependencies';
