@@ -662,14 +662,7 @@
 															class="shape-option"
 															class:active={ov.shape === shape.id}
 															onclick={() => setOverride(sel.className, 'shape', shape.id)}
-															title={shape.name}
-															aria-label={shape.name}
-														>
-															<span
-																class="shape-preview"
-																style:border-radius={shape.borderRadius}
-															></span>
-														</button>
+														>{shape.id}</button>
 													{/each}
 												</div>
 											</label>
@@ -1203,14 +1196,6 @@
 		background: color-mix(in srgb, var(--accent) 15%, var(--surface));
 		border-color: var(--accent);
 		color: var(--accent);
-	}
-
-	.shape-preview {
-		width: 14px;
-		height: 10px;
-		display: inline-block;
-		border: 1.25px solid currentColor;
-		background: transparent;
 	}
 
 	h4 {
