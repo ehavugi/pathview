@@ -531,11 +531,10 @@
 					{/if}
 				{:else if step === 'trust'}
 					<div class="trust">
-						<h3>You're about to run third-party code</h3>
 						<p>
-							PathView will install <strong>{resolvedDisplayName}</strong> and import it into Pyodide. The code runs
-							in your browser, sandboxed inside this tab, but it can still make network requests, read clipboard
-							data, or consume CPU and memory.
+							You're about to run third-party code. PathView will install <strong>{resolvedDisplayName}</strong> and
+							import it into Pyodide. The code runs in your browser, sandboxed inside this tab, but it can still make
+							network requests, read clipboard data, or consume CPU and memory.
 						</p>
 						<p>Only continue if you trust the source.</p>
 						<div class="source-recap">
@@ -984,13 +983,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-md);
-	}
-
-	.trust h3 {
-		margin: 0;
-		font-size: var(--font-md);
-		font-weight: normal;
-		color: var(--text-muted);
 	}
 
 	.trust p {
