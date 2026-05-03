@@ -23,3 +23,13 @@ export {
 	removeToolbox,
 	replaceToolboxes
 } from './store';
+
+export {
+	installPackage,
+	loadInlineModule,
+	introspectBlocks,
+	introspectEvents,
+	uninstallModule,
+	type IntrospectedBlock,
+	type IntrospectedEvent
+} from './installer';
