@@ -580,15 +580,13 @@
 						</div>
 						<div class="block-table" role="table">
 							<div class="block-row block-head" role="row">
-								<button
-									class="head-check"
-									onclick={toggleAllBlocks}
+								<input
+									type="checkbox"
+									checked={allBlocksOn}
+									indeterminate={someBlocksOn && !allBlocksOn}
+									onchange={toggleAllBlocks}
 									aria-label={allBlocksOn ? 'Deselect all' : 'Select all'}
-								>
-									<span class="checkbox" class:checked={allBlocksOn} class:indeterminate={someBlocksOn && !allBlocksOn}>
-										{#if allBlocksOn}<Icon name="check" size={10} />{/if}
-									</span>
-								</button>
+								/>
 								<span>Block</span>
 								<span>Description</span>
 								<span>Category</span>
@@ -600,15 +598,12 @@
 								{@const open = activeOverrideRow === sel.className}
 								{#if block}
 									<div class="block-row" role="row">
-										<button
-											class="head-check"
-											onclick={() => toggleBlock(sel.className)}
+										<input
+											type="checkbox"
+											checked={sel.enabled}
+											onchange={() => toggleBlock(sel.className)}
 											aria-label={sel.enabled ? 'Deselect' : 'Select'}
-										>
-											<span class="checkbox" class:checked={sel.enabled}>
-												{#if sel.enabled}<Icon name="check" size={10} />{/if}
-											</span>
-										</button>
+										/>
 										<span class="block-name">{sel.className}</span>
 										<span class="block-desc">{block.description.split('\n')[0]}</span>
 										<input
@@ -665,15 +660,12 @@
 							<div class="block-table" role="table">
 								{#each eventSelections as sel (sel.className)}
 									<div class="block-row event-row" role="row">
-										<button
-											class="head-check"
-											onclick={() => toggleEvent(sel.className)}
+										<input
+											type="checkbox"
+											checked={sel.enabled}
+											onchange={() => toggleEvent(sel.className)}
 											aria-label={sel.enabled ? 'Deselect' : 'Select'}
-										>
-											<span class="checkbox" class:checked={sel.enabled}>
-												{#if sel.enabled}<Icon name="check" size={10} />{/if}
-											</span>
-										</button>
+										/>
 										<span class="block-name">{sel.className}</span>
 										<span class="block-desc">
 											{discoveredEvents.find((e) => e.className === sel.className)?.description.split('\n')[0] ?? ''}
@@ -1064,6 +1056,10 @@
 		border-bottom: 1px solid var(--border);
 	}
 
+	.block-row > input[type='checkbox'] {
+		justify-self: center;
+	}
+
 	.block-row:last-child {
 		border-bottom: none;
 	}
@@ -1094,51 +1090,6 @@
 	.cat-input {
 		font-size: var(--font-base);
 		padding: var(--space-xs) var(--space-sm);
-	}
-
-	/* Custom checkbox matching pathview design */
-	.head-check {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		padding: 0;
-		background: transparent;
-		border: none;
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-	}
-
-	.head-check:hover {
-		background: var(--surface-hover);
-	}
-
-	.checkbox {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 14px;
-		height: 14px;
-		border-radius: 3px;
-		border: 1px solid var(--border-focus);
-		background: var(--surface-raised);
-		color: var(--surface);
-		transition: background var(--transition-fast), border-color var(--transition-fast);
-	}
-
-	.checkbox.checked {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: var(--surface);
-	}
-
-	.checkbox.indeterminate::after {
-		content: '';
-		width: 8px;
-		height: 2px;
-		background: var(--accent);
-		border-radius: 1px;
 	}
 
 	.row-expand {
