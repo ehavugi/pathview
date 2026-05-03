@@ -156,9 +156,6 @@ export async function performInstall(
 		const moduleName = await loadInlineModule(baseName, source.code);
 		return { importPath: moduleName };
 	}
-	if (source.type === 'curated') {
-		throw new Error('Curated catalog install not implemented yet');
-	}
 	throw new Error(`Unknown toolbox source type: ${(source as { type: string }).type}`);
 }
 
@@ -192,7 +189,7 @@ export async function discoverToolbox(config: {
  * Resolution order: user override → categoryByClass → defaultCategory →
  * toolbox display name.
  */
-export async function registerToolbox(
+export function registerToolbox(
 	config: ToolboxConfig,
 	options: {
 		blocks: IntrospectedBlock[];
@@ -200,7 +197,7 @@ export async function registerToolbox(
 		defaultCategory?: string;
 		categoryByClass?: Record<string, string>;
 	}
-): Promise<void> {
+): void {
 	// Clear any prior registrations for this id.
 	nodeRegistry.unregisterSource(config.id);
 	eventRegistry.unregisterSource(config.id);

@@ -3,7 +3,6 @@
 	import { cubicOut } from 'svelte/easing';
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { tooltip } from '$lib/components/Tooltip.svelte';
-	import { nodeRegistry, registryVersion } from '$lib/nodes';
 	import {
 		TOOLBOX_CATALOG,
 		performInstall,
@@ -42,25 +41,6 @@
 	let installed = $state<ToolboxConfig[]>([]);
 	toolboxes.subscribe((list) => (installed = list));
 
-	// Track registry changes so the "built-in present" check stays fresh
-	let registryTick = $state(0);
-	registryVersion.subscribe((v) => (registryTick = v));
-
-	/**
-	 * Check whether a catalog entry is already available via build-time
-	 * registration. We declare it "available" if at least one of its
-	 * declared blocks is in the registry under a non-runtime source.
-	 */
-	function isCatalogBuiltIn(entry: CatalogEntry): boolean {
-		void registryTick; // dependency
-		const classes = Object.keys(entry.categoryByClass ?? {});
-		if (classes.length === 0) return false;
-		for (const c of classes) {
-			const src = nodeRegistry.getSource(c);
-			if (src && src !== entry.id) return true;
-		}
-		return false;
-	}
 
 	// Source-step inputs
 	let pypiPkg = $state('');
@@ -83,7 +63,7 @@
 	let defaultCategory = $state<string | undefined>(undefined);
 
 	// Install + discover state
-	let installStatus = $state<'idle' | 'installing' | 'discovering' | 'done' | 'error'>('idle');
+	let installStatus = $state<'idle' | 'installing' | 'discovering' | 'error'>('idle');
 	let installMessage = $state('');
 	let installError = $state('');
 	let discoveredBlocks = $state<IntrospectedBlock[]>([]);
@@ -247,10 +227,6 @@
 					resolvedDisplayName;
 			}
 
-			installStatus = 'done';
-			installMessage = `Found ${discovered.blocks.length} block${
-				discovered.blocks.length === 1 ? '' : 's'
-			}${discovered.events.length ? ` and ${discovered.events.length} event(s)` : ''}.`;
 			step = 'select';
 		} catch (err) {
 			installStatus = 'error';
@@ -328,7 +304,7 @@
 			blocks: blockSelections,
 			events: eventSelections
 		};
-		await registerToolbox(config, {
+		registerToolbox(config, {
 			blocks: discoveredBlocks,
 			events: discoveredEvents,
 			defaultCategory,
@@ -339,17 +315,10 @@
 		onClose();
 	}
 
-	// Built-in catalog entries: installed via the build-time bundle
-	const builtInCatalog = $derived.by(() => {
-		const installedIds = new Set(installed.map((t) => t.id));
-		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id) && isCatalogBuiltIn(e));
-	});
-
-	// Catalog entries available for runtime install (not already in either list)
+	// Catalog entries that aren't already installed
 	const availableCatalog = $derived.by(() => {
 		const installedIds = new Set(installed.map((t) => t.id));
-		const builtInIds = new Set(builtInCatalog.map((e) => e.id));
-		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id) && !builtInIds.has(e.id));
+		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id));
 	});
 
 	// Dot index across the add-toolbox flow (manager view = no progress dots)
@@ -407,23 +376,13 @@
 			<div class="manager-body">
 				{#if step === 'manager'}
 					<div class="manager">
-						{#if installed.length === 0 && builtInCatalog.length === 0}
+						{#if installed.length === 0}
 							<div class="empty">
 								<span>No toolboxes installed yet</span>
 								<span class="hint">Add one to extend the block library at runtime.</span>
 							</div>
 						{:else}
 							<div class="installed-list">
-								{#each builtInCatalog as entry (entry.id)}
-									<div class="installed-row">
-										<div class="installed-meta">
-											<div class="installed-name">
-												{entry.displayName}
-												<span class="badge">built-in</span>
-											</div>
-										</div>
-									</div>
-								{/each}
 								{#each installed as t (t.id)}
 									<div class="installed-row">
 										<div class="installed-meta">
@@ -435,8 +394,6 @@
 													url · {t.source.url}
 												{:else if t.source.type === 'inline'}
 													file · {t.source.filename}
-												{:else}
-													{t.source.type}
 												{/if}
 												· {t.blocks.filter((b) => b.enabled).length} block{t.blocks.filter((b) => b.enabled).length === 1 ? '' : 's'}
 											</div>
@@ -766,20 +723,6 @@
 		gap: var(--space-sm);
 		justify-content: flex-end;
 		margin-top: var(--space-sm);
-	}
-
-	.badge {
-		display: inline-block;
-		font-size: var(--font-sm);
-		font-weight: 500;
-		color: var(--text-muted);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		padding: 1px 6px;
-		margin-left: var(--space-sm);
-		text-transform: lowercase;
-		letter-spacing: 0;
 	}
 
 	.step-dot {

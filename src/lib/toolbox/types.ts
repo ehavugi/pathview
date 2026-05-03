@@ -13,8 +13,7 @@
 export type ToolboxSource =
 	| { type: 'pypi'; pkg: string; version?: string }
 	| { type: 'url'; url: string }
-	| { type: 'inline'; filename: string; code: string }
-	| { type: 'curated'; id: string };
+	| { type: 'inline'; filename: string; code: string };
 
 /** Per-block UI overrides applied on top of the introspected metadata. */
 export interface BlockOverride {

@@ -207,7 +207,7 @@ async function installRequiredToolboxes(reqs: ToolboxRequirement[]): Promise<voi
 				blocks: discovered.blocks.map((b) => ({ className: b.className, enabled: true })),
 				events: discovered.events.map((e) => ({ className: e.className, enabled: true }))
 			};
-			await registerToolbox(config, {
+			registerToolbox(config, {
 				blocks: discovered.blocks,
 				events: discovered.events,
 				defaultCategory: catalog?.defaultCategory,

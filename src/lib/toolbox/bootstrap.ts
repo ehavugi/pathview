@@ -52,7 +52,7 @@ export async function bootstrapToolboxes(): Promise<void> {
 			};
 
 			const catalog = getCatalogEntry(config.id);
-			await registerToolbox(filled, {
+			registerToolbox(filled, {
 				blocks: discovered.blocks,
 				events: discovered.events,
 				defaultCategory: catalog?.defaultCategory,
