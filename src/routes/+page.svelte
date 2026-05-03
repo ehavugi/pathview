@@ -15,6 +15,9 @@
 	import NodeLibrary from '$lib/components/panels/NodeLibrary.svelte';
 	import EventsPanel from '$lib/components/panels/EventsPanel.svelte';
 	import SubsystemTree from '$lib/components/panels/SubsystemTree.svelte';
+	import ToolboxWizardDialog from '$lib/components/dialogs/ToolboxWizardDialog.svelte';
+	import { bootstrapToolboxes, toolboxes as toolboxStore, type ToolboxConfig } from '$lib/toolbox';
+	import { get } from 'svelte/store';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import { buildContextMenuItems, type ContextMenuCallbacks } from '$lib/components/contextMenuBuilders';
 	import ExportDialog from '$lib/components/dialogs/ExportDialog.svelte';
@@ -406,6 +409,13 @@
 
 	let exportDialogOpen = $state(false);
 	let showKeyboardShortcuts = $state(false);
+	let toolboxWizardOpen = $state(false);
+	let toolboxWizardEditing = $state<ToolboxConfig | null>(null);
+
+	function openToolboxWizard(editing: ToolboxConfig | null = null) {
+		toolboxWizardEditing = editing;
+		toolboxWizardOpen = true;
+	}
 	let showSearchDialog = $state(false);
 	let showPlotOptionsDialog = $state(false);
 
@@ -495,6 +505,20 @@
 	onMount(() => {
 		// Auto-detect same-origin Flask backend (pip package mode), then check URL params
 		autoDetectBackend().then(() => initBackendFromUrl());
+
+		// If the user has persisted runtime toolboxes from a previous session,
+		// boot Pyodide eagerly and re-install them so the blocks are available
+		// before they try to use them. Skipped when no toolboxes are saved.
+		if (get(toolboxStore).length > 0) {
+			(async () => {
+				try {
+					await initPyodide();
+					await bootstrapToolboxes();
+				} catch (e) {
+					console.error('[toolbox bootstrap]', e);
+				}
+			})();
+		}
 
 		// Subscribe to stores (with cleanup)
 		const unsubPinnedPreviews = pinnedPreviewsStore.subscribe((pinned) => {
@@ -1315,6 +1339,7 @@
 			<NodeLibrary
 				bind:this={nodeLibraryRef}
 				onAddNode={handleAddNode}
+				onOpenToolboxWizard={openToolboxWizard}
 				focusSearch={true}
 			/>
 		</ResizablePanel>
@@ -1471,6 +1496,13 @@
 
 	<!-- Keyboard Shortcuts Dialog -->
 	<KeyboardShortcutsDialog open={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />
+
+	<!-- Toolbox Wizard -->
+	<ToolboxWizardDialog
+		open={toolboxWizardOpen}
+		editing={toolboxWizardEditing}
+		onClose={() => { toolboxWizardOpen = false; toolboxWizardEditing = null; }}
+	/>
 	<SearchDialog open={showSearchDialog} onClose={() => showSearchDialog = false} />
 	<PlotOptionsDialog open={showPlotOptionsDialog} onClose={() => showPlotOptionsDialog = false} traces={resultTraces} />
 

@@ -40,3 +40,7 @@ export {
 	registerToolbox,
 	uninstallToolbox
 } from './register';
+
+export { TOOLBOX_CATALOG, getCatalogEntry, type CatalogEntry } from './catalog';
+
+export { bootstrapToolboxes, type BootstrapStatus } from './bootstrap';
