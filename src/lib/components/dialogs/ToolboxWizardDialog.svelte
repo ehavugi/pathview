@@ -988,9 +988,9 @@
 
 	.trust h3 {
 		margin: 0;
-		font-size: var(--font-lg);
+		font-size: var(--font-md);
+		font-weight: 500;
 		color: var(--text-muted);
-		font-weight: 600;
 	}
 
 	.trust p {
