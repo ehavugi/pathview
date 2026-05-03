@@ -36,38 +36,38 @@ export async function bootstrapToolboxes(): Promise<void> {
 				eventsImportPath: config.eventsImportPath
 			});
 
-			// Fill in empty selection lists from a fresh seed so state is
-			// always concrete after the first successful install.
-			const filled: ToolboxConfig = {
+			// Reconcile selections against current discovery: preserves the
+			// user's enabled/override choices, adds new classes the upstream
+			// package introduced (enabled by default), and drops entries
+			// whose classes no longer exist.
+			const reconciled: ToolboxConfig = {
 				...config,
 				importPath: installResult.importPath,
-				blocks:
-					config.blocks.length === 0
-						? discovered.blocks.map((b) => ({ className: b.className, enabled: true }))
-						: config.blocks,
-				events:
-					config.events.length === 0
-						? discovered.events.map((e) => ({ className: e.className, enabled: true }))
-						: config.events
+				blocks: discovered.blocks.map(
+					(b) =>
+						config.blocks.find((s) => s.className === b.className) ?? {
+							className: b.className,
+							enabled: true
+						}
+				),
+				events: discovered.events.map(
+					(e) =>
+						config.events.find((s) => s.className === e.className) ?? {
+							className: e.className,
+							enabled: true
+						}
+				)
 			};
 
 			const catalog = getCatalogEntry(config.id);
-			registerToolbox(filled, {
+			registerToolbox(reconciled, {
 				blocks: discovered.blocks,
 				events: discovered.events,
 				defaultCategory: catalog?.defaultCategory,
 				categoryByClass: catalog?.categoryByClass
 			});
 
-			// Persist if the install changed anything (importPath fix-up,
-			// freshly populated block/event lists).
-			if (
-				filled.importPath !== config.importPath ||
-				filled.blocks !== config.blocks ||
-				filled.events !== config.events
-			) {
-				upsertToolbox(filled);
-			}
+			upsertToolbox(reconciled);
 		} catch (e) {
 			console.error(`[toolbox] bootstrap failed for "${config.id}":`, e);
 		}

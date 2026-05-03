@@ -156,5 +156,8 @@ export async function uninstallModule(importPath: string): Promise<string[]> {
 	const result = await evaluate<{ ok: boolean; dropped: string[] }>(
 		`pathview_uninstall(${pyStr(importPath)})`
 	);
+	if (!result.ok) {
+		throw new Error(`Failed to drop module "${importPath}"`);
+	}
 	return result.dropped;
 }

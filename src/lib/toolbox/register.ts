@@ -181,8 +181,13 @@ export async function discoverToolbox(config: {
 	if (config.eventsImportPath) {
 		try {
 			events = await introspectEvents(config.eventsImportPath);
-		} catch {
-			events = []; // Events submodule is optional.
+		} catch (e) {
+			// Events submodule is optional — likely just doesn't exist for
+			// this toolbox. Log but don't fail the install.
+			console.warn(
+				`[toolbox] event introspection skipped for "${config.eventsImportPath}":`,
+				e
+			);
 		}
 	}
 	return { blocks, events };
