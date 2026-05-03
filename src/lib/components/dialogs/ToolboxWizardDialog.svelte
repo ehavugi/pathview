@@ -3,6 +3,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { tooltip } from '$lib/components/Tooltip.svelte';
+	import { nodeRegistry, registryVersion } from '$lib/nodes';
 	import {
 		TOOLBOX_CATALOG,
 		performInstall,
@@ -40,6 +41,26 @@
 	// Reactive list of installed toolboxes (drives manager and catalog filter)
 	let installed = $state<ToolboxConfig[]>([]);
 	toolboxes.subscribe((list) => (installed = list));
+
+	// Track registry changes so the "built-in present" check stays fresh
+	let registryTick = $state(0);
+	registryVersion.subscribe((v) => (registryTick = v));
+
+	/**
+	 * Check whether a catalog entry is already available via build-time
+	 * registration. We declare it "available" if at least one of its
+	 * declared blocks is in the registry under a non-runtime source.
+	 */
+	function isCatalogBuiltIn(entry: CatalogEntry): boolean {
+		void registryTick; // dependency
+		const classes = Object.keys(entry.categoryByClass ?? {});
+		if (classes.length === 0) return false;
+		for (const c of classes) {
+			const src = nodeRegistry.getSource(c);
+			if (src && src !== entry.id) return true;
+		}
+		return false;
+	}
 
 	// Source-step inputs
 	let pypiPkg = $state('');
@@ -302,45 +323,23 @@
 		onClose();
 	}
 
-	// Catalog entries that aren't already installed
-	const availableCatalog = $derived.by(() => {
+	// Built-in catalog entries: installed via the build-time bundle
+	const builtInCatalog = $derived.by(() => {
 		const installedIds = new Set(installed.map((t) => t.id));
-		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id));
+		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id) && isCatalogBuiltIn(e));
 	});
 
-	// Step-specific footer actions (dot index, back target, primary)
-	type FooterPrimary = { label: string; fn: () => void; disabled?: boolean } | null;
+	// Catalog entries available for runtime install (not already in either list)
+	const availableCatalog = $derived.by(() => {
+		const installedIds = new Set(installed.map((t) => t.id));
+		const builtInIds = new Set(builtInCatalog.map((e) => e.id));
+		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id) && !builtInIds.has(e.id));
+	});
+
+	// Dot index across the wizard flow (manager view = no progress dots)
 	const dotIndex = $derived(
 		step === 'source' ? 0 : step === 'trust' ? 1 : step === 'install' ? 2 : step === 'select' ? 3 : step === 'customize' ? 4 : -1
 	);
-
-	const backTarget = $derived.by((): Step | null => {
-		if (step === 'source') return 'manager';
-		if (step === 'trust') return 'source';
-		if (step === 'install') return installStatus === 'error' ? 'source' : null;
-		if (step === 'select') return editing ? null : 'trust';
-		if (step === 'customize') return 'select';
-		return null;
-	});
-
-	const primary = $derived.by((): FooterPrimary => {
-		if (step === 'manager') return null; // Add button is in body
-		if (step === 'source') {
-			if (tab === 'catalog') return null; // cards do the work
-			if (tab === 'pypi') return { label: 'Continue', fn: confirmPyPI, disabled: !pypiPkg.trim() };
-			if (tab === 'url')
-				return { label: 'Continue', fn: confirmUrl, disabled: !urlValue.trim() || !urlImportPath.trim() };
-			if (tab === 'file') return { label: 'Continue', fn: confirmFile, disabled: !fileName };
-		}
-		if (step === 'trust') return { label: 'I trust this, install', fn: runInstallAndDiscover };
-		if (step === 'install') {
-			if (installStatus === 'error') return { label: 'Retry', fn: runInstallAndDiscover };
-			return null;
-		}
-		if (step === 'select') return { label: 'Save', fn: save };
-		if (step === 'customize') return { label: 'Save', fn: save };
-		return null;
-	});
 
 	function handleBackdrop(e: MouseEvent) {
 		if (e.target === e.currentTarget) onClose();
@@ -363,7 +362,17 @@
 			aria-labelledby="wizard-title"
 		>
 			<div class="dialog-header">
-				<span id="wizard-title">Toolbox manager</span>
+				<span id="wizard-title">
+					{#if step === 'manager'}Toolbox manager{:else}Add toolbox{/if}
+				</span>
+				{#if step === 'source'}
+					<div class="header-tabs">
+						<button class="header-tab" class:active={tab === 'catalog'} onclick={() => (tab = 'catalog')}>Catalog</button>
+						<button class="header-tab" class:active={tab === 'pypi'} onclick={() => (tab = 'pypi')}>PyPI</button>
+						<button class="header-tab" class:active={tab === 'url'} onclick={() => (tab = 'url')}>URL</button>
+						<button class="header-tab" class:active={tab === 'file'} onclick={() => (tab = 'file')}>File</button>
+					</div>
+				{/if}
 				<div class="header-actions">
 					<button class="icon-btn" onclick={onClose} aria-label="Close">
 						<Icon name="x" size={16} />
@@ -374,13 +383,24 @@
 			<div class="wizard-body">
 				{#if step === 'manager'}
 					<div class="manager">
-						{#if installed.length === 0}
+						{#if installed.length === 0 && builtInCatalog.length === 0}
 							<div class="empty">
 								<span>No toolboxes installed yet</span>
 								<span class="hint">Add one to extend the block library at runtime.</span>
 							</div>
 						{:else}
 							<div class="installed-list">
+								{#each builtInCatalog as entry (entry.id)}
+									<div class="installed-row">
+										<div class="installed-meta">
+											<div class="installed-name">
+												{entry.displayName}
+												<span class="badge">built-in</span>
+											</div>
+											<div class="installed-source">{entry.description}</div>
+										</div>
+									</div>
+								{/each}
 								{#each installed as t (t.id)}
 									<div class="installed-row">
 										<div class="installed-meta">
@@ -424,13 +444,6 @@
 						</button>
 					</div>
 				{:else if step === 'source'}
-					<div class="header-tabs">
-						<button class="header-tab" class:active={tab === 'catalog'} onclick={() => (tab = 'catalog')}>Catalog</button>
-						<button class="header-tab" class:active={tab === 'pypi'} onclick={() => (tab = 'pypi')}>PyPI</button>
-						<button class="header-tab" class:active={tab === 'url'} onclick={() => (tab = 'url')}>URL</button>
-						<button class="header-tab" class:active={tab === 'file'} onclick={() => (tab = 'file')}>File</button>
-					</div>
-
 					{#if tab === 'catalog'}
 						<div class="catalog-grid">
 							{#each availableCatalog as entry (entry.id)}
@@ -472,6 +485,10 @@
 								<span>Events import path (optional)</span>
 								<input bind:value={eventsImportPathInput} placeholder="pathsim_batt.events" />
 							</label>
+							<div class="step-actions">
+								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={confirmPyPI} disabled={!pypiPkg.trim()}>Continue</button>
+							</div>
 						</div>
 					{:else if tab === 'url'}
 						<div class="form">
@@ -491,6 +508,10 @@
 								<span>Events import path (optional)</span>
 								<input bind:value={eventsImportPathInput} placeholder="pathsim_x.events" />
 							</label>
+							<div class="step-actions">
+								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={confirmUrl} disabled={!urlValue.trim() || !urlImportPath.trim()}>Continue</button>
+							</div>
 						</div>
 					{:else if tab === 'file'}
 						<div class="form">
@@ -502,6 +523,10 @@
 								<span>Display name (optional)</span>
 								<input bind:value={displayNameInput} placeholder="defaults to file name" />
 							</label>
+							<div class="step-actions">
+								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={confirmFile} disabled={!fileName}>Continue</button>
+							</div>
 						</div>
 					{/if}
 				{:else if step === 'trust'}
@@ -523,6 +548,10 @@
 								local file <code>{resolvedSource.filename}</code> ({resolvedSource.code.length.toLocaleString()} chars)
 							{/if}
 						</div>
+						<div class="step-actions">
+							<button class="ghost" onclick={() => (step = 'source')}>Back</button>
+							<button onclick={runInstallAndDiscover}>I trust this, install</button>
+						</div>
 					</div>
 				{:else if step === 'install'}
 					<div class="install">
@@ -530,6 +559,10 @@
 							<div class="error">
 								<div class="error-title">Installation failed</div>
 								<pre>{installError}</pre>
+								<div class="step-actions">
+									<button class="ghost" onclick={() => (step = 'source')}>Back</button>
+									<button onclick={runInstallAndDiscover}>Retry</button>
+								</div>
 							</div>
 						{:else}
 							<div class="spinner-row">
@@ -545,7 +578,6 @@
 							<div class="row-toolbar-actions">
 								<button class="ghost" onclick={() => setAllBlocks(true)}>Select all</button>
 								<button class="ghost" onclick={() => setAllBlocks(false)}>None</button>
-								<button class="ghost" onclick={() => (step = 'customize')}>Customize…</button>
 							</div>
 						</div>
 						<div class="block-table" role="table">
@@ -584,6 +616,13 @@
 								{/each}
 							</div>
 						{/if}
+						<div class="step-actions">
+							{#if !editing}
+								<button class="ghost" onclick={() => (step = 'trust')}>Back</button>
+							{/if}
+							<button class="ghost" onclick={() => (step = 'customize')}>Customize…</button>
+							<button onclick={save}>Save</button>
+						</div>
 					</div>
 				{:else if step === 'customize'}
 					<div class="customize-step">
@@ -640,27 +679,23 @@
 								{/if}
 							</div>
 						{/each}
+						<div class="step-actions">
+							<button class="ghost" onclick={() => (step = 'select')}>Back</button>
+							<button onclick={save}>Save</button>
+						</div>
 					</div>
 				{/if}
 			</div>
 
-			<div class="wizard-footer">
-				<div class="step-dots">
-					{#if dotIndex >= 0}
+			{#if dotIndex >= 0}
+				<div class="wizard-footer">
+					<div class="step-dots">
 						{#each Array(5) as _, i}
 							<span class="step-dot" class:active={i === dotIndex} class:done={i < dotIndex}></span>
 						{/each}
-					{/if}
+					</div>
 				</div>
-				<div class="footer-actions">
-					{#if backTarget}
-						<button class="ghost" onclick={() => (step = backTarget!)}>Back</button>
-					{/if}
-					{#if primary}
-						<button onclick={primary.fn} disabled={primary.disabled}>{primary.label}</button>
-					{/if}
-				</div>
-			</div>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -692,7 +727,7 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: center;
 		padding: var(--space-sm) var(--space-md);
 		background: var(--surface-raised);
 		border-top: 1px solid var(--border);
@@ -702,6 +737,27 @@
 		display: flex;
 		gap: var(--space-xs);
 		align-items: center;
+	}
+
+	.step-actions {
+		display: flex;
+		gap: var(--space-sm);
+		justify-content: flex-end;
+		margin-top: var(--space-sm);
+	}
+
+	.badge {
+		display: inline-block;
+		font-size: var(--font-sm);
+		font-weight: 500;
+		color: var(--text-muted);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		padding: 1px 6px;
+		margin-left: var(--space-sm);
+		text-transform: lowercase;
+		letter-spacing: 0;
 	}
 
 	.step-dot {
@@ -717,11 +773,6 @@
 
 	.step-dot.done {
 		background: color-mix(in srgb, var(--accent) 50%, transparent);
-	}
-
-	.footer-actions {
-		display: flex;
-		gap: var(--space-sm);
 	}
 
 	/* Manager view */
@@ -792,11 +843,13 @@
 		border-color: var(--border-focus);
 	}
 
-	/* Pill tabs (matching plot panel header-tab pattern) */
+	/* Pill tabs in the dialog header (matching plot panel pattern) */
 	.header-tabs {
 		display: flex;
 		gap: var(--space-xs);
-		flex-wrap: wrap;
+		margin-left: var(--space-sm);
+		margin-right: auto;
+		overflow-x: auto;
 	}
 
 	.header-tab {
@@ -812,6 +865,9 @@
 		border-radius: 12px;
 		color: var(--text-muted);
 		cursor: pointer;
+		white-space: nowrap;
+		text-transform: none;
+		letter-spacing: 0;
 	}
 
 	.header-tab:hover {
