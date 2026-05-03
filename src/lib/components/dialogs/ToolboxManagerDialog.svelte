@@ -647,7 +647,7 @@
 													placeholder={defaultCategory ?? resolvedDisplayName}
 												/>
 											</label>
-											<label>
+											<div class="row-override-field">
 												<span>Shape</span>
 												<div class="shape-segmented">
 													<button
@@ -663,7 +663,7 @@
 														>{shape}</button>
 													{/each}
 												</div>
-											</label>
+											</div>
 											<label>
 												<span>Sync ports</span>
 												<input
@@ -1147,7 +1147,8 @@
 		border-bottom: none;
 	}
 
-	.row-override label {
+	.row-override label,
+	.row-override-field {
 		display: grid;
 		grid-template-columns: 100px 1fr;
 		align-items: center;
