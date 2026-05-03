@@ -9,13 +9,22 @@ import { exec, evaluate, getBackendType } from '$lib/pyodide/backend';
 import { initPyodide } from '$lib/pyodide/bridge';
 import { TOOLBOX_PYTHON_HELPERS, TOOLBOX_HELPERS_SENTINEL } from './python';
 
+/** A single parameter as returned by the runtime introspector. */
+export interface IntrospectedParam {
+	name: string;
+	default: string | null;
+	type: string;
+	description: string;
+}
+
 /** Raw block metadata as returned by pathview_introspect_blocks. */
 export interface IntrospectedBlock {
 	className: string;
 	description: string;
+	docstringHtml: string;
 	inputs: Record<string, number> | string[] | null;
 	outputs: Record<string, number> | string[] | null;
-	params: { name: string; default: unknown; type: string }[];
+	params: IntrospectedParam[];
 	error?: string;
 }
 
@@ -23,7 +32,8 @@ export interface IntrospectedBlock {
 export interface IntrospectedEvent {
 	className: string;
 	description: string;
-	params: { name: string; default: unknown; type: string }[];
+	docstringHtml: string;
+	params: IntrospectedParam[];
 }
 
 let helpersLoaded = false;

@@ -13,8 +13,66 @@ import importlib as _pv_importlib
 import inspect as _pv_inspect
 import types as _pv_types
 import json as _pv_json
+import re as _pv_re
 
 _PV_INLINE_PREFIX = "pathview_inline_"
+
+# Lazy/cached docutils probe — only loaded if available
+_pv_publish_parts = None
+_pv_docutils_checked = False
+
+def _pv_rst_to_html(rst):
+    """Convert RST docstring to HTML using docutils if installed."""
+    global _pv_publish_parts, _pv_docutils_checked
+    if not rst:
+        return ""
+    if not _pv_docutils_checked:
+        _pv_docutils_checked = True
+        try:
+            from docutils.core import publish_parts
+            _pv_publish_parts = publish_parts
+        except Exception:
+            _pv_publish_parts = None
+    if _pv_publish_parts is None:
+        return ""
+    try:
+        cleaned = _pv_inspect.cleandoc(rst)
+        parts = _pv_publish_parts(
+            cleaned,
+            writer_name="html",
+            settings_overrides={
+                "report_level": 5,
+                "halt_level": 5,
+                "initial_header_level": 3,
+                "math_output": "MathJax",
+            },
+        )
+        return parts.get("body") or ""
+    except Exception:
+        return ""
+
+def _pv_first_line(docstring):
+    """First sentence of the docstring (used as the short description)."""
+    if not docstring:
+        return ""
+    for line in docstring.strip().split("\n"):
+        s = line.strip()
+        if not s:
+            continue
+        if ". " in s:
+            return s.split(". ")[0] + "."
+        return s
+    return ""
+
+def _pv_param_desc(docstring, param_name):
+    """Extract a ':param name:' description from an RST docstring."""
+    if not docstring:
+        return ""
+    pattern = rf"{_pv_re.escape(param_name)}\s*:\s*[^\n]*\n\s+(.+?)(?=\n\s*\w+\s*:|\n\n|$)"
+    m = _pv_re.search(pattern, docstring, _pv_re.DOTALL)
+    if m:
+        return _pv_re.sub(r"\s+", " ", m.group(1).strip())
+    return ""
 
 def _pv_already_installed(import_path):
     """Return True if the given module path is already importable."""
@@ -71,41 +129,51 @@ def _pv_drop_module(import_path):
                 pass
     return dropped
 
-def _pv_default_repr(value):
-    """Best-effort JSON-friendly repr of a default parameter value."""
-    if value is _pv_inspect.Parameter.empty:
-        return None
-    try:
-        _pv_json.dumps(value)
-        return value
-    except (TypeError, ValueError):
-        try:
-            return repr(value)
-        except Exception:
-            return None
-
-def _pv_infer_type(value):
-    """Infer a coarse parameter type from a default value."""
+def _pv_format_default(value):
+    """Format a parameter default as a TypeScript-compatible source string,
+    matching scripts/extract.py format_default()."""
     if value is None or value is _pv_inspect.Parameter.empty:
-        return "any"
+        return None
+    if callable(value) and not isinstance(value, type):
+        return None
     if isinstance(value, bool):
-        return "bool"
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    if isinstance(value, str):
+        return _pv_json.dumps(value)
+    if isinstance(value, (list, tuple)):
+        try:
+            return _pv_json.dumps(list(value))
+        except Exception:
+            return repr(list(value))
+    if isinstance(value, type):
+        return _pv_json.dumps(value.__name__)
+    try:
+        return repr(value)
+    except Exception:
+        return None
+
+def _pv_infer_type(value, name=""):
+    """Infer ParamType, mirroring scripts/extract.py infer_param_type()."""
+    if name and (name.startswith("func_") or name.startswith("func")):
+        return "callable"
+    if callable(value) and not isinstance(value, type):
+        return "callable"
+    if isinstance(value, bool):
+        return "boolean"
     if isinstance(value, int):
-        return "number"
+        return "integer"
     if isinstance(value, float):
         return "number"
     if isinstance(value, str):
         return "string"
     if isinstance(value, (list, tuple)):
         return "array"
-    if isinstance(value, dict):
-        return "object"
-    if callable(value):
-        return "function"
     return "any"
 
-def _pv_extract_params(cls):
-    """Extract __init__ parameters via inspect.signature."""
+def _pv_extract_params(cls, docstring):
+    """Extract __init__ parameters via inspect.signature, with RST descriptions."""
     params = []
     try:
         sig = _pv_inspect.signature(cls.__init__)
@@ -119,16 +187,18 @@ def _pv_extract_params(cls):
             _pv_inspect.Parameter.VAR_KEYWORD,
         ):
             continue
-        default = _pv_default_repr(p.default)
         params.append({
             "name": pname,
-            "default": default,
-            "type": _pv_infer_type(p.default),
+            "default": _pv_format_default(p.default),
+            "type": _pv_infer_type(p.default, pname),
+            "description": _pv_param_desc(docstring, pname),
         })
     return params
 
 def _pv_extract_block(cls):
     """Pull metadata for a single block class."""
+    raw_doc = cls.__doc__ or ""
+
     info = None
     info_fn = getattr(cls, "info", None)
     if callable(info_fn):
@@ -138,17 +208,22 @@ def _pv_extract_block(cls):
             info = None
 
     if info is not None:
+        # Prefer info["description"] but fall back to __doc__ for the RST
+        # source so we can parse :param: and HTML the same way as build-time.
+        rst = (info.get("description") or raw_doc).strip()
         params = []
         for pname, meta in (info.get("parameters") or {}).items():
             default = meta.get("default") if isinstance(meta, dict) else None
             params.append({
                 "name": pname,
-                "default": _pv_default_repr(default),
-                "type": _pv_infer_type(default),
+                "default": _pv_format_default(default),
+                "type": _pv_infer_type(default, pname),
+                "description": _pv_param_desc(rst, pname),
             })
         return {
             "className": cls.__name__,
-            "description": (info.get("description") or "").strip(),
+            "description": _pv_first_line(rst),
+            "docstringHtml": _pv_rst_to_html(rst),
             "inputs": info.get("input_port_labels"),
             "outputs": info.get("output_port_labels"),
             "params": params,
@@ -156,10 +231,11 @@ def _pv_extract_block(cls):
 
     return {
         "className": cls.__name__,
-        "description": (cls.__doc__ or "").strip(),
+        "description": _pv_first_line(raw_doc),
+        "docstringHtml": _pv_rst_to_html(raw_doc),
         "inputs": getattr(cls, "input_port_labels", None),
         "outputs": getattr(cls, "output_port_labels", None),
-        "params": _pv_extract_params(cls),
+        "params": _pv_extract_params(cls, raw_doc),
     }
 
 def _pv_is_block(cls):
@@ -221,10 +297,12 @@ def pathview_introspect_events(import_path):
             continue
         if obj.__module__ != mod.__name__ and not obj.__module__.startswith(mod.__name__ + "."):
             continue
+        raw_doc = obj.__doc__ or ""
         events.append({
             "className": obj.__name__,
-            "description": (obj.__doc__ or "").strip(),
-            "params": _pv_extract_params(obj),
+            "description": _pv_first_line(raw_doc),
+            "docstringHtml": _pv_rst_to_html(raw_doc),
+            "params": _pv_extract_params(obj, raw_doc),
         })
     return {"ok": True, "events": events}
 

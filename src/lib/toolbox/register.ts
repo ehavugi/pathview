@@ -48,18 +48,29 @@ function resolvePorts(
 	return { ports, max: ports.length };
 }
 
+const PARAM_TYPES: ReadonlySet<ParamType> = new Set([
+	'number',
+	'integer',
+	'boolean',
+	'string',
+	'array',
+	'callable',
+	'any'
+]);
+
 function asParamType(t: string): ParamType {
-	if (t === 'number' || t === 'string' || t === 'bool' || t === 'array' || t === 'object') {
-		return t as ParamType;
-	}
-	return 'string';
+	return PARAM_TYPES.has(t as ParamType) ? (t as ParamType) : 'any';
 }
 
+const EVENT_PARAM_TYPES: ReadonlySet<EventParamType> = new Set([
+	'number',
+	'string',
+	'callable',
+	'array'
+]);
+
 function asEventParamType(t: string): EventParamType {
-	if (t === 'number' || t === 'string' || t === 'callable' || t === 'array') {
-		return t as EventParamType;
-	}
-	return 'string';
+	return EVENT_PARAM_TYPES.has(t as EventParamType) ? (t as EventParamType) : 'string';
 }
 
 /** Build a node definition from one introspected block + the user's selection. */
@@ -67,12 +78,16 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 	const { ports: inputs, max: maxInputs } = resolvePorts(block.inputs);
 	const { ports: outputs, max: maxOutputs } = resolvePorts(block.outputs);
 
-	const params: Record<string, { type: ParamType; default: unknown }> = {};
+	const params: Record<string, { type: ParamType; default: unknown; description?: string }> = {};
 	for (const p of block.params) {
-		params[p.name] = { type: asParamType(p.type), default: p.default };
+		params[p.name] = {
+			type: asParamType(p.type),
+			default: p.default,
+			description: p.description || undefined
+		};
 	}
 
-	return defineNode({
+	const definition = defineNode({
 		name: selection.override?.name ?? block.className,
 		category: selection.override?.category ?? fallbackCategory,
 		blockClass: block.className,
@@ -85,21 +100,32 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 		syncPorts: selection.override?.syncPorts || undefined,
 		params
 	});
+
+	if (block.docstringHtml) {
+		definition.docstring = block.docstringHtml;
+	}
+
+	return definition;
 }
 
 function buildEventDefinition(event: IntrospectedEvent, selection: EventSelection, importPath: string): EventTypeDefinition {
 	const params: EventParamDefinition[] = event.params.map((p) => ({
 		name: p.name,
 		type: asEventParamType(p.type),
-		default: p.default
+		default: p.default,
+		description: p.description || undefined
 	}));
-	return {
+	const def: EventTypeDefinition = {
 		type: `${importPath}.${event.className}`,
 		name: selection.override?.name ?? event.className,
 		description: event.description,
 		params,
 		eventClass: event.className
 	};
+	if (event.docstringHtml) {
+		def.docstringHtml = event.docstringHtml;
+	}
+	return def;
 }
 
 /**
