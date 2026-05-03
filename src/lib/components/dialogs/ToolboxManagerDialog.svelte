@@ -4,7 +4,6 @@
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { tooltip } from '$lib/components/Tooltip.svelte';
 	import { nodeRegistry, registryVersion } from '$lib/nodes';
-	import { getAllShapes } from '$lib/nodes/shapes/registry';
 	import {
 		TOOLBOX_CATALOG,
 		performInstall,
@@ -97,10 +96,7 @@
 
 	// Per-row expanded override editor
 	let activeOverrideRow = $state<string | null>(null);
-	// Shape options surfaced in the override panel — sourced from the global
-	// shape registry so the dropdown stays in sync with whatever shapes the
-	// app supports.
-	const SHAPE_OPTIONS = getAllShapes().filter((s) => s.id !== 'default');
+	const SHAPE_OPTIONS = ['pill', 'rect', 'mixed'] as const;
 
 	$effect(() => {
 		if (!open) return;
@@ -657,12 +653,12 @@
 														class:active={!ov.shape}
 														onclick={() => setOverride(sel.className, 'shape', undefined)}
 													>default</button>
-													{#each SHAPE_OPTIONS as shape (shape.id)}
+													{#each SHAPE_OPTIONS as shape (shape)}
 														<button
 															class="shape-option"
-															class:active={ov.shape === shape.id}
-															onclick={() => setOverride(sel.className, 'shape', shape.id)}
-														>{shape.id}</button>
+															class:active={ov.shape === shape}
+															onclick={() => setOverride(sel.className, 'shape', shape)}
+														>{shape}</button>
 													{/each}
 												</div>
 											</label>
