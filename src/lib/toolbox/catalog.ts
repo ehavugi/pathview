@@ -12,10 +12,6 @@ export interface CatalogEntry {
 	id: string;
 	/** Display name in the catalog and Block Library section header. */
 	displayName: string;
-	/** One-line description shown on the catalog card. */
-	description: string;
-	/** Tags shown as small pills on the card. */
-	tags: string[];
 	/** Pre-defined install source. */
 	source: ToolboxSource;
 	/** Python module path used for block introspection. */
@@ -33,8 +29,6 @@ export const TOOLBOX_CATALOG: CatalogEntry[] = [
 	{
 		id: 'pathsim-chem',
 		displayName: 'pathsim-chem',
-		description: 'Chemical engineering blocks: reactors, separators, mixers and more.',
-		tags: ['Chemical', 'Process'],
 		source: { type: 'pypi', pkg: 'pathsim-chem' },
 		importPath: 'pathsim_chem',
 		categoryByClass: {

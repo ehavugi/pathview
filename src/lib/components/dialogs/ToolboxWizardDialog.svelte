@@ -397,7 +397,6 @@
 												{entry.displayName}
 												<span class="badge">built-in</span>
 											</div>
-											<div class="installed-source">{entry.description}</div>
 										</div>
 									</div>
 								{/each}
@@ -449,12 +448,6 @@
 							{#each availableCatalog as entry (entry.id)}
 								<button class="catalog-card" onclick={() => pickCatalog(entry)}>
 									<div class="catalog-name">{entry.displayName}</div>
-									<div class="catalog-desc">{entry.description}</div>
-									<div class="catalog-tags">
-										{#each entry.tags as tag}
-											<span class="tag">{tag}</span>
-										{/each}
-									</div>
 								</button>
 							{:else}
 								<div class="empty">
@@ -892,26 +885,6 @@
 		font-weight: 600;
 		font-size: var(--font-md);
 		color: var(--text-muted);
-	}
-
-	.catalog-desc {
-		color: var(--text-muted);
-		font-size: var(--font-base);
-		line-height: 1.4;
-	}
-
-	.catalog-tags {
-		display: flex;
-		gap: var(--space-xs);
-		flex-wrap: wrap;
-	}
-
-	.tag {
-		font-size: var(--font-sm);
-		color: var(--text-muted);
-		background: var(--surface);
-		padding: 2px var(--space-xs);
-		border-radius: var(--radius-sm);
 	}
 
 	.form {
