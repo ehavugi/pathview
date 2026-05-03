@@ -5,7 +5,7 @@
  * importlib introspection) via the existing Pyodide REPL bridge.
  */
 
-import { exec, evaluate } from '$lib/pyodide/backend';
+import { exec, evaluate, getBackendType } from '$lib/pyodide/backend';
 import { initPyodide } from '$lib/pyodide/bridge';
 import { TOOLBOX_PYTHON_HELPERS, TOOLBOX_HELPERS_SENTINEL } from './python';
 
@@ -50,13 +50,27 @@ function pyStr(s: string): string {
 }
 
 /**
- * Install a package via micropip. `spec` can be a PyPI name, a versioned
- * spec ("name==1.2"), or a wheel URL.
+ * Install a package. Skips when `importPath` is given and the module is
+ * already importable (saves a round-trip + download).
+ *
+ * Routes through micropip in Pyodide and through `pip install` in the
+ * Flask backend, so the user always gets the path appropriate for their
+ * runtime.
  */
-export async function installPackage(spec: string): Promise<void> {
+export async function installPackage(spec: string, importPath?: string): Promise<void> {
 	await ensureHelpers();
-	// micropip.install must be awaited; runPythonAsync supports top-level await.
-	await exec(`await _pv_install_spec(${pyStr(spec)})`);
+	if (importPath) {
+		const already = await evaluate<boolean>(`_pv_already_installed(${pyStr(importPath)})`);
+		if (already) return;
+	}
+	const backend = getBackendType();
+	if (backend === 'pyodide') {
+		// runPythonAsync supports top-level await for micropip.install
+		await exec(`await _pv_install_micropip(${pyStr(spec)})`);
+	} else {
+		// Flask / remote: real CPython, use subprocess pip (sync)
+		await exec(`_pv_install_pip(${pyStr(spec)})`);
+	}
 }
 
 /**

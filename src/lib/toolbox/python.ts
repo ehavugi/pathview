@@ -16,11 +16,34 @@ import json as _pv_json
 
 _PV_INLINE_PREFIX = "pathview_inline_"
 
-async def _pv_install_spec(spec):
-    """Install a package via micropip. Spec can be 'name', 'name==1.2', or a wheel URL."""
+def _pv_already_installed(import_path):
+    """Return True if the given module path is already importable."""
+    if not import_path:
+        return False
+    try:
+        _pv_importlib.import_module(import_path)
+        return True
+    except Exception:
+        return False
+
+async def _pv_install_micropip(spec):
+    """Pyodide-side install via micropip (top-level await)."""
     import micropip
     await micropip.install(spec, keep_going=True)
-    return {"ok": True, "spec": spec}
+    return {"ok": True, "spec": spec, "via": "micropip"}
+
+def _pv_install_pip(spec):
+    """CPython-side install via subprocess pip (Flask backend)."""
+    import subprocess as _pv_subprocess
+    import sys as _pv_runtime_sys
+    res = _pv_subprocess.run(
+        [_pv_runtime_sys.executable, "-m", "pip", "install", spec],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        raise RuntimeError("pip install failed:\\n" + (res.stderr or res.stdout))
+    return {"ok": True, "spec": spec, "via": "pip"}
 
 def _pv_load_inline(module_name, code):
     """Exec a single-file Python module string into sys.modules under module_name."""

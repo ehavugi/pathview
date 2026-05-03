@@ -119,16 +119,16 @@ export async function performInstall(
 ): Promise<{ importPath: string }> {
 	if (source.type === 'pypi') {
 		const spec = source.version ? `${source.pkg}==${source.version}` : source.pkg;
-		await installPackage(spec);
 		// Default to the package name with `_` if caller didn't specify.
 		const importPath = requestedImportPath ?? source.pkg.replace(/-/g, '_');
+		await installPackage(spec, importPath);
 		return { importPath };
 	}
 	if (source.type === 'url') {
-		await installPackage(source.url);
 		if (!requestedImportPath) {
 			throw new Error('importPath is required when installing from URL');
 		}
+		await installPackage(source.url, requestedImportPath);
 		return { importPath: requestedImportPath };
 	}
 	if (source.type === 'inline') {
