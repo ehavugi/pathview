@@ -81,7 +81,6 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 		outputs,
 		maxInputs,
 		maxOutputs,
-		shape: selection.override?.shape,
 		params
 	});
 }

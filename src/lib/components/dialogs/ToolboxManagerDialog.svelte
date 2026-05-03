@@ -95,7 +95,6 @@
 
 	// Per-row expanded override editor
 	let activeOverrideRow = $state<string | null>(null);
-	const SHAPES = ['pill', 'rect', 'circle', 'diamond'] as const;
 
 	$effect(() => {
 		if (!open) return;
@@ -285,7 +284,7 @@
 
 	function setOverride(
 		className: string,
-		field: 'name' | 'shape',
+		field: 'name',
 		value: string | undefined
 	) {
 		blockSelections = blockSelections.map((s) =>
@@ -628,26 +627,6 @@
 													oninput={(e) => setOverride(sel.className, 'name', (e.target as HTMLInputElement).value)}
 													placeholder={sel.className}
 												/>
-											</label>
-											<label>
-												<span>Shape</span>
-												<div class="shape-segmented">
-													<button
-														class="shape-option"
-														class:active={!ov.shape}
-														onclick={() => setOverride(sel.className, 'shape', undefined)}
-													>default</button>
-													{#each SHAPES as s}
-														<button
-															class="shape-option"
-															class:active={ov.shape === s}
-															onclick={() => setOverride(sel.className, 'shape', s)}
-														>
-															<span class="shape-preview" data-shape={s}></span>
-															<span>{s}</span>
-														</button>
-													{/each}
-												</div>
 											</label>
 										</div>
 									{/if}
@@ -1116,7 +1095,6 @@
 		flex-direction: column;
 		gap: var(--space-sm);
 		padding: var(--space-sm) var(--space-md);
-		border-bottom: 1px solid var(--border);
 		background: var(--surface);
 	}
 
@@ -1127,68 +1105,6 @@
 		gap: var(--space-sm);
 		font-size: var(--font-base);
 		color: var(--text-muted);
-	}
-
-	.shape-segmented {
-		display: inline-flex;
-		gap: var(--space-xs);
-		flex-wrap: wrap;
-	}
-
-	.shape-option {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		height: 26px;
-		padding: 0 10px;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 13px;
-		color: var(--text-muted);
-		font-size: var(--font-base);
-		cursor: pointer;
-		text-transform: none;
-		letter-spacing: 0;
-	}
-
-	.shape-option:hover {
-		background: var(--surface-hover);
-		border-color: var(--border-focus);
-	}
-
-	.shape-option.active {
-		background: color-mix(in srgb, var(--accent) 15%, var(--surface));
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-
-	.shape-preview {
-		width: 14px;
-		height: 10px;
-		display: inline-block;
-		border: 1.25px solid currentColor;
-		background: transparent;
-	}
-
-	.shape-preview[data-shape='pill'] {
-		border-radius: 999px;
-	}
-
-	.shape-preview[data-shape='rect'] {
-		border-radius: 2px;
-	}
-
-	.shape-preview[data-shape='circle'] {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-	}
-
-	.shape-preview[data-shape='diamond'] {
-		width: 12px;
-		height: 12px;
-		transform: rotate(45deg);
-		border-radius: 1px;
 	}
 
 	h4 {

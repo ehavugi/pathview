@@ -9,8 +9,6 @@
  * represented here.
  */
 
-import type { NodeShape } from '$lib/types/nodes';
-
 /** Where the toolbox came from. */
 export type ToolboxSource =
 	| { type: 'pypi'; pkg: string; version?: string }
@@ -24,8 +22,6 @@ export interface BlockOverride {
 	name?: string;
 	/** Category override (defaults to the toolbox-config category). */
 	category?: string;
-	/** Custom shape (pill/rect/circle/diamond). */
-	shape?: NodeShape;
 }
 
 /** A single block exposed by a toolbox; user can disable or override per-block. */
