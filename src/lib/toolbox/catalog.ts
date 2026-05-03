@@ -19,9 +19,12 @@ export interface CatalogEntry {
 	/** Optional events submodule. */
 	eventsImportPath?: string;
 	/**
-	 * Default category to assign to specific block classes. Falls back to
-	 * the toolbox's display name for any class not listed here.
+	 * Default category assigned to every block from this toolbox unless
+	 * overridden by `categoryByClass` or by the user in the wizard.
+	 * Falls back to the toolbox display name if not set.
 	 */
+	defaultCategory?: string;
+	/** Per-class category override (takes precedence over defaultCategory). */
 	categoryByClass?: Record<string, string>;
 }
 
@@ -31,21 +34,7 @@ export const TOOLBOX_CATALOG: CatalogEntry[] = [
 		displayName: 'pathsim-chem',
 		source: { type: 'pypi', pkg: 'pathsim-chem' },
 		importPath: 'pathsim_chem',
-		categoryByClass: {
-			Process: 'Chemical',
-			ResidenceTime: 'Chemical',
-			Splitter: 'Chemical',
-			Bubbler4: 'Chemical',
-			GLC: 'Chemical',
-			CSTR: 'Chemical',
-			PFR: 'Chemical',
-			HeatExchanger: 'Chemical',
-			FlashDrum: 'Chemical',
-			Mixer: 'Chemical',
-			Valve: 'Chemical',
-			Heater: 'Chemical',
-			PointKinetics: 'Chemical'
-		}
+		defaultCategory: 'Chemical'
 	}
 ];
 

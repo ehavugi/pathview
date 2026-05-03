@@ -22,6 +22,8 @@ export interface BlockOverride {
 	name?: string;
 	/** Category override (defaults to the toolbox-config category). */
 	category?: string;
+	/** Shape id (must match a shape registered in shapes/registry.ts). */
+	shape?: string;
 }
 
 /** A single block exposed by a toolbox; user can disable or override per-block. */

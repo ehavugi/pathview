@@ -35,6 +35,7 @@ export async function bootstrapToolboxes(): Promise<void> {
 			await registerToolbox(updatedConfig, {
 				blocks: discovered.blocks,
 				events: discovered.events,
+				defaultCategory: catalog?.defaultCategory,
 				categoryByClass: catalog?.categoryByClass
 			});
 		} catch (e) {

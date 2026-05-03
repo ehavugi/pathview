@@ -8,7 +8,7 @@
 
 import { defineNode } from '$lib/nodes/defineNode';
 import { nodeRegistry } from '$lib/nodes/registry';
-import type { ParamType } from '$lib/nodes/types';
+import type { NodeShape, ParamType } from '$lib/nodes/types';
 import { eventRegistry } from '$lib/events/registry';
 import type {
 	EventParamDefinition,
@@ -81,6 +81,7 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 		outputs,
 		maxInputs,
 		maxOutputs,
+		shape: selection.override?.shape as NodeShape | undefined,
 		params
 	});
 }
@@ -159,14 +160,17 @@ export async function discoverToolbox(config: {
  * Register the user's selected blocks/events under the toolbox source id.
  * Replaces any previous registration for the same toolbox id.
  *
- * `categoryByClass` lets the toolbox config pin a default category per
- * class (used when the selection has no explicit override).
+ * `defaultCategory` and `categoryByClass` both come from the catalog and
+ * provide fallbacks when the user hasn't set an explicit override.
+ * Resolution order: user override → categoryByClass → defaultCategory →
+ * toolbox display name.
  */
 export async function registerToolbox(
 	config: ToolboxConfig,
 	options: {
 		blocks: IntrospectedBlock[];
 		events: IntrospectedEvent[];
+		defaultCategory?: string;
 		categoryByClass?: Record<string, string>;
 	}
 ): Promise<void> {
@@ -181,7 +185,10 @@ export async function registerToolbox(
 		if (!sel.enabled) continue;
 		const block = blocksByClass.get(sel.className);
 		if (!block || block.error) continue;
-		const fallbackCategory = options.categoryByClass?.[sel.className] ?? config.displayName;
+		const fallbackCategory =
+			options.categoryByClass?.[sel.className] ??
+			options.defaultCategory ??
+			config.displayName;
 		const def = buildBlockDefinition(block, sel, fallbackCategory);
 		nodeRegistry.register(def, config.id);
 	}

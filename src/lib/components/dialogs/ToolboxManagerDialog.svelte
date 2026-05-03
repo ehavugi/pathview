@@ -4,6 +4,7 @@
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { tooltip } from '$lib/components/Tooltip.svelte';
 	import { nodeRegistry, registryVersion } from '$lib/nodes';
+	import { getAllShapes } from '$lib/nodes/shapes/registry';
 	import {
 		TOOLBOX_CATALOG,
 		performInstall,
@@ -80,6 +81,7 @@
 	let resolvedEventsImportPath = $state<string | undefined>(undefined);
 	let toolboxId = $state('');
 	let categoryByClass = $state<Record<string, string>>({});
+	let defaultCategory = $state<string | undefined>(undefined);
 
 	// Install + discover state
 	let installStatus = $state<'idle' | 'installing' | 'discovering' | 'done' | 'error'>('idle');
@@ -95,6 +97,10 @@
 
 	// Per-row expanded override editor
 	let activeOverrideRow = $state<string | null>(null);
+	// Shape options surfaced in the override panel — sourced from the global
+	// shape registry so the dropdown stays in sync with whatever shapes the
+	// app supports.
+	const SHAPE_OPTIONS = getAllShapes().filter((s) => s.id !== 'default');
 
 	$effect(() => {
 		if (!open) return;
@@ -119,6 +125,7 @@
 		resolvedEventsImportPath = undefined;
 		toolboxId = '';
 		categoryByClass = {};
+		defaultCategory = undefined;
 		installStatus = 'idle';
 		installMessage = '';
 		installError = '';
@@ -159,6 +166,7 @@
 		resolvedEventsImportPath = entry.eventsImportPath;
 		toolboxId = entry.id;
 		categoryByClass = entry.categoryByClass ?? {};
+		defaultCategory = entry.defaultCategory;
 		step = 'trust';
 	}
 
@@ -171,6 +179,7 @@
 		resolvedEventsImportPath = eventsImportPathInput.trim() || undefined;
 		toolboxId = `pypi:${pkg}`;
 		categoryByClass = {};
+		defaultCategory = undefined;
 		step = 'trust';
 	}
 
@@ -182,6 +191,7 @@
 		resolvedEventsImportPath = eventsImportPathInput.trim() || undefined;
 		toolboxId = `url:${urlValue.trim()}`;
 		categoryByClass = {};
+		defaultCategory = undefined;
 		step = 'trust';
 	}
 
@@ -201,6 +211,7 @@
 		resolvedEventsImportPath = undefined;
 		toolboxId = `inline:${fileName}`;
 		categoryByClass = {};
+		defaultCategory = undefined;
 		step = 'trust';
 	}
 
@@ -236,6 +247,7 @@
 				categoryEdits[b.className] =
 					blockSelections.find((s) => s.className === b.className)?.override?.category ??
 					categoryByClass[b.className] ??
+					defaultCategory ??
 					resolvedDisplayName;
 			}
 
@@ -284,7 +296,7 @@
 
 	function setOverride(
 		className: string,
-		field: 'name',
+		field: 'name' | 'shape',
 		value: string | undefined
 	) {
 		blockSelections = blockSelections.map((s) =>
@@ -315,6 +327,7 @@
 		await registerToolbox(config, {
 			blocks: discoveredBlocks,
 			events: discoveredEvents,
+			defaultCategory,
 			categoryByClass
 		});
 		upsertToolbox(config);
@@ -627,6 +640,30 @@
 													oninput={(e) => setOverride(sel.className, 'name', (e.target as HTMLInputElement).value)}
 													placeholder={sel.className}
 												/>
+											</label>
+											<label>
+												<span>Shape</span>
+												<div class="shape-segmented">
+													<button
+														class="shape-option"
+														class:active={!ov.shape}
+														onclick={() => setOverride(sel.className, 'shape', undefined)}
+													>default</button>
+													{#each SHAPE_OPTIONS as shape (shape.id)}
+														<button
+															class="shape-option"
+															class:active={ov.shape === shape.id}
+															onclick={() => setOverride(sel.className, 'shape', shape.id)}
+															title={shape.name}
+															aria-label={shape.name}
+														>
+															<span
+																class="shape-preview"
+																style:border-radius={shape.borderRadius}
+															></span>
+														</button>
+													{/each}
+												</div>
 											</label>
 										</div>
 									{/if}
@@ -1105,6 +1142,49 @@
 		gap: var(--space-sm);
 		font-size: var(--font-base);
 		color: var(--text-muted);
+	}
+
+	.shape-segmented {
+		display: inline-flex;
+		gap: var(--space-xs);
+		flex-wrap: wrap;
+	}
+
+	.shape-option {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		min-width: 28px;
+		height: 26px;
+		padding: 0 10px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 13px;
+		color: var(--text-muted);
+		font-size: var(--font-base);
+		cursor: pointer;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.shape-option:hover {
+		background: var(--surface-hover);
+		border-color: var(--border-focus);
+	}
+
+	.shape-option.active {
+		background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.shape-preview {
+		width: 14px;
+		height: 10px;
+		display: inline-block;
+		border: 1.25px solid currentColor;
+		background: transparent;
 	}
 
 	h4 {
