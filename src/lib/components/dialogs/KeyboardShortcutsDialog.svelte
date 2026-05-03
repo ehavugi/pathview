@@ -68,6 +68,7 @@
 				{ keys: ['S'], description: 'Simulation' },
 				{ keys: ['B'], description: 'Blocks' },
 				{ keys: ['N'], description: 'Events' },
+				{ keys: ['R'], description: 'Subsystems' },
 				{ keys: ['E'], description: 'Editor' },
 				{ keys: ['V'], description: 'Results' },
 				{ keys: ['C'], description: 'Console' },

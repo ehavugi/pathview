@@ -14,6 +14,7 @@
 	import CodeEditor from '$lib/components/panels/CodeEditor.svelte';
 	import NodeLibrary from '$lib/components/panels/NodeLibrary.svelte';
 	import EventsPanel from '$lib/components/panels/EventsPanel.svelte';
+	import SubsystemTree from '$lib/components/panels/SubsystemTree.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import { buildContextMenuItems, type ContextMenuCallbacks } from '$lib/components/contextMenuBuilders';
 	import ExportDialog from '$lib/components/dialogs/ExportDialog.svelte';
@@ -163,6 +164,13 @@
 	let showProperties = $state(false);
 	let showNodeLibrary = $state(false);
 	let showEventsPanel = $state(false);
+	let showSubsystemTree = $state(false);
+	let hasAnySubsystem = $state(false);
+	graphStore.subsystemTree.subscribe((tree) => {
+		const next = tree.length > 0;
+		if (!next && showSubsystemTree) showSubsystemTree = false;
+		hasAnySubsystem = next;
+	});
 	let showCodeEditor = $state(false);
 	let showPlot = $state(false);
 	let showConsole = $state(false);
@@ -193,6 +201,7 @@
 	// Track side panel widths for fitView padding calculation
 	let nodeLibraryWidth = $state(320);
 	let eventsPanelWidth = $state(280);
+	let subsystemTreeWidth = $state(260);
 	let codeEditorWidth = $state(400);
 	const propertiesPanelWidth = 310; // Fixed width, not resizable
 
@@ -284,6 +293,7 @@
 			showNodeLibrary = false;
 		} else {
 			showEventsPanel = false;
+			showSubsystemTree = false;
 			showNodeLibrary = true;
 			setTimeout(() => nodeLibraryRef?.focus(), 50);
 		}
@@ -295,7 +305,19 @@
 			showEventsPanel = false;
 		} else {
 			showNodeLibrary = false;
+			showSubsystemTree = false;
 			showEventsPanel = true;
+		}
+	}
+
+	// Toggle subsystem tree (closes other left panels if open)
+	function toggleSubsystemTree() {
+		if (showSubsystemTree) {
+			showSubsystemTree = false;
+		} else {
+			showNodeLibrary = false;
+			showEventsPanel = false;
+			showSubsystemTree = true;
 		}
 	}
 
@@ -339,11 +361,18 @@
 		const _h = windowHeight;
 		const _nlw = nodeLibraryWidth;
 		const _epw = eventsPanelWidth;
+		const _stw = subsystemTreeWidth;
 		const _cew = codeEditorWidth;
 
 		// Calculate pixel offsets for each side
-		// Left panels: Block Library or Events (only one can be open at a time)
-		const leftPanelWidth = showNodeLibrary ? nodeLibraryWidth : showEventsPanel ? eventsPanelWidth : 0;
+		// Left panels: Block Library, Events or Subsystem Tree (only one can be open at a time)
+		const leftPanelWidth = showNodeLibrary
+			? nodeLibraryWidth
+			: showEventsPanel
+				? eventsPanelWidth
+				: showSubsystemTree
+					? subsystemTreeWidth
+					: 0;
 		const leftPx = PANEL_TOGGLES_WIDTH + PANEL_GAP + (leftPanelWidth > 0 ? leftPanelWidth + PANEL_GAP : 0);
 
 		// Right panels: Code Editor or Simulation (Properties)
@@ -712,6 +741,8 @@
 						showNodeLibrary = false;
 					} else if (showEventsPanel) {
 						showEventsPanel = false;
+					} else if (showSubsystemTree) {
+						showSubsystemTree = false;
 					} else if (showProperties) {
 						showProperties = false;
 					}
@@ -751,6 +782,10 @@
 				case 'n':
 					event.preventDefault();
 					toggleEventsPanel();
+					return;
+				case 'r':
+					event.preventDefault();
+					toggleSubsystemTree();
 					return;
 				case 'h':
 					event.preventDefault();
@@ -1178,6 +1213,21 @@
 			</button>
 		</div>
 
+		<!-- Navigation -->
+		{#if hasAnySubsystem}
+			<div class="toggle-group">
+				<button
+					class="toggle-btn"
+					class:active={showSubsystemTree}
+					onclick={toggleSubsystemTree}
+					use:tooltip={{ text: "Subsystems", shortcut: "R", position: "right" }}
+					aria-label="Subsystems"
+				>
+					<Icon name="layers" size={18} />
+				</button>
+			</div>
+		{/if}
+
 		<!-- Output panels -->
 		<div class="toggle-group">
 			<button
@@ -1286,6 +1336,22 @@
 			onWidthChange={(w) => eventsPanelWidth = Math.min(400, Math.max(200, w))}
 		>
 			<EventsPanel />
+		</ResizablePanel>
+	{/if}
+
+	<!-- Subsystem Tree Panel (left) -->
+	{#if showSubsystemTree}
+		<ResizablePanel
+			position="left"
+			width={subsystemTreeWidth}
+			minWidth={220}
+			maxWidth={460}
+			bottomOffset={leftPanelBottomOffset()}
+			title="Subsystems"
+			onClose={() => showSubsystemTree = false}
+			onWidthChange={(w) => subsystemTreeWidth = Math.min(460, Math.max(220, w))}
+		>
+			<SubsystemTree />
 		</ResizablePanel>
 	{/if}
 
