@@ -478,7 +478,7 @@
 								<input bind:value={eventsImportPathInput} placeholder="pathsim_batt.events" />
 							</label>
 							<div class="step-actions">
-								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={() => (step = 'manager')}>Back</button>
 								<button onclick={confirmPyPI} disabled={!pypiPkg.trim()}>Continue</button>
 							</div>
 						</div>
@@ -501,7 +501,7 @@
 								<input bind:value={eventsImportPathInput} placeholder="pathsim_x.events" />
 							</label>
 							<div class="step-actions">
-								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={() => (step = 'manager')}>Back</button>
 								<button onclick={confirmUrl} disabled={!urlValue.trim() || !urlImportPath.trim()}>Continue</button>
 							</div>
 						</div>
@@ -516,7 +516,7 @@
 								<input bind:value={displayNameInput} placeholder="defaults to file name" />
 							</label>
 							<div class="step-actions">
-								<button class="ghost" onclick={() => (step = 'manager')}>Back</button>
+								<button onclick={() => (step = 'manager')}>Back</button>
 								<button onclick={confirmFile} disabled={!fileName}>Continue</button>
 							</div>
 						</div>
@@ -539,7 +539,7 @@
 							{/if}
 						</div>
 						<div class="step-actions">
-							<button class="ghost" onclick={() => (step = 'source')}>Back</button>
+							<button onclick={() => (step = 'source')}>Back</button>
 							<button onclick={runInstallAndDiscover}>I trust this, install</button>
 						</div>
 					</div>
@@ -550,7 +550,7 @@
 								<div class="error-title">Installation failed</div>
 								<pre>{installError}</pre>
 								<div class="step-actions">
-									<button class="ghost" onclick={() => (step = 'source')}>Back</button>
+									<button onclick={() => (step = 'source')}>Back</button>
 									<button onclick={runInstallAndDiscover}>Retry</button>
 								</div>
 							</div>
@@ -566,8 +566,8 @@
 						<div class="row-toolbar">
 							<div class="muted">{enabledBlockCount} of {blockSelections.length} blocks selected</div>
 							<div class="row-toolbar-actions">
-								<button class="ghost" onclick={() => setAllBlocks(true)}>Select all</button>
-								<button class="ghost" onclick={() => setAllBlocks(false)}>None</button>
+								<button onclick={() => setAllBlocks(true)}>Select all</button>
+								<button onclick={() => setAllBlocks(false)}>None</button>
 							</div>
 						</div>
 						<div class="block-table" role="table">
@@ -608,9 +608,9 @@
 						{/if}
 						<div class="step-actions">
 							{#if !editing}
-								<button class="ghost" onclick={() => (step = 'trust')}>Back</button>
+								<button onclick={() => (step = 'trust')}>Back</button>
 							{/if}
-							<button class="ghost" onclick={() => (step = 'customize')}>Customize…</button>
+							<button onclick={() => (step = 'customize')}>Customize…</button>
 							<button onclick={save}>Save</button>
 						</div>
 					</div>
@@ -670,7 +670,7 @@
 							</div>
 						{/each}
 						<div class="step-actions">
-							<button class="ghost" onclick={() => (step = 'select')}>Back</button>
+							<button onclick={() => (step = 'select')}>Back</button>
 							<button onclick={save}>Save</button>
 						</div>
 					</div>
@@ -815,7 +815,7 @@
 	}
 
 	.add-row {
-		align-self: flex-start;
+		align-self: flex-end;
 	}
 
 	/* Pill tabs in the dialog header (matching plot panel pattern) */
