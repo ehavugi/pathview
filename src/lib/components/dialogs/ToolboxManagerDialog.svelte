@@ -306,6 +306,14 @@
 		);
 	}
 
+	function setSyncPorts(className: string, value: boolean) {
+		blockSelections = blockSelections.map((s) =>
+			s.className === className
+				? { ...s, override: { ...(s.override ?? {}), syncPorts: value || undefined } }
+				: s
+		);
+	}
+
 	function getOverride(className: string) {
 		return blockSelections.find((s) => s.className === className)?.override ?? {};
 	}
@@ -664,6 +672,15 @@
 														</button>
 													{/each}
 												</div>
+											</label>
+											<label>
+												<span>Sync ports</span>
+												<input
+													type="checkbox"
+													checked={ov.syncPorts ?? false}
+													onchange={(e) =>
+														setSyncPorts(sel.className, (e.target as HTMLInputElement).checked)}
+												/>
 											</label>
 										</div>
 									{/if}
@@ -1142,6 +1159,10 @@
 		gap: var(--space-sm);
 		font-size: var(--font-base);
 		color: var(--text-muted);
+	}
+
+	.row-override label > input[type='checkbox'] {
+		justify-self: start;
 	}
 
 	.shape-segmented {

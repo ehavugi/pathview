@@ -24,6 +24,12 @@ export interface BlockOverride {
 	category?: string;
 	/** Shape id (must match a shape registered in shapes/registry.ts). */
 	shape?: string;
+	/**
+	 * When true, the output port count is forced to mirror the input port
+	 * count — used for blocks that process inputs as parallel paths (e.g.
+	 * Integrator, Amplifier in core pathsim).
+	 */
+	syncPorts?: boolean;
 }
 
 /** A single block exposed by a toolbox; user can disable or override per-block. */

@@ -82,6 +82,7 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 		maxInputs,
 		maxOutputs,
 		shape: selection.override?.shape as NodeShape | undefined,
+		syncPorts: selection.override?.syncPorts || undefined,
 		params
 	});
 }
