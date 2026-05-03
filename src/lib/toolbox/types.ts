@@ -2,7 +2,7 @@
  * Runtime toolbox types
  *
  * A "toolbox" is a runtime-installable bundle of block (and optionally event)
- * types. The user adds toolboxes via the wizard; their selections are
+ * types. The user adds toolboxes via the toolbox manager; their selections are
  * persisted to localStorage and replayed at app start.
  *
  * Built-in toolboxes (currently `pathsim`) are bundled at build time and not

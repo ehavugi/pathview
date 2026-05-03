@@ -145,7 +145,7 @@ export async function performInstall(
 /**
  * Run introspection for a configured toolbox. The toolbox must already be
  * installed (importable). Returns the raw introspection data so the caller
- * can present it in the wizard (e.g. for selection step).
+ * can present it in the manager (e.g. for selection step).
  */
 export async function discoverToolbox(config: {
 	importPath: string;

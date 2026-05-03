@@ -1,7 +1,7 @@
 /**
  * Runtime toolbox installer + introspector.
  *
- * Bridges the JS side (toolbox config, wizard) to the Python side (micropip,
+ * Bridges the JS side (toolbox config, manager) to the Python side (micropip,
  * importlib introspection) via the existing Pyodide REPL bridge.
  */
 

@@ -1,7 +1,7 @@
 /**
  * Curated toolbox catalog.
  *
- * Hardcoded list of toolboxes that show up in the wizard's "Catalog" tab.
+ * Hardcoded list of toolboxes that show up in the manager's "Catalog" tab.
  * Users can still install anything else via PyPI / URL / file upload.
  */
 

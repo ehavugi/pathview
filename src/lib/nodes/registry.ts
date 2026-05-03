@@ -6,7 +6,7 @@
  *   - "builtin": baked in at build time (extracted from `pathsim` core via
  *     `scripts/extract.py`).
  *   - a runtime toolbox id: registered by the toolbox installer when the
- *     user adds a toolbox via the wizard. Removed on uninstall.
+ *     user adds a toolbox via the toolbox manager. Removed on uninstall.
  *
  * `registryVersion` is a Svelte store that bumps on every change so the UI
  * (NodeLibrary, etc.) can stay in sync with runtime changes.

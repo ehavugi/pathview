@@ -15,7 +15,7 @@
 	import NodeLibrary from '$lib/components/panels/NodeLibrary.svelte';
 	import EventsPanel from '$lib/components/panels/EventsPanel.svelte';
 	import SubsystemTree from '$lib/components/panels/SubsystemTree.svelte';
-	import ToolboxWizardDialog from '$lib/components/dialogs/ToolboxWizardDialog.svelte';
+	import ToolboxManagerDialog from '$lib/components/dialogs/ToolboxManagerDialog.svelte';
 	import { bootstrapToolboxes, toolboxes as toolboxStore, type ToolboxConfig } from '$lib/toolbox';
 	import { get } from 'svelte/store';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
@@ -409,12 +409,12 @@
 
 	let exportDialogOpen = $state(false);
 	let showKeyboardShortcuts = $state(false);
-	let toolboxWizardOpen = $state(false);
-	let toolboxWizardEditing = $state<ToolboxConfig | null>(null);
+	let toolboxManagerOpen = $state(false);
+	let toolboxManagerEditing = $state<ToolboxConfig | null>(null);
 
-	function openToolboxWizard(editing: ToolboxConfig | null = null) {
-		toolboxWizardEditing = editing;
-		toolboxWizardOpen = true;
+	function openToolboxManager(editing: ToolboxConfig | null = null) {
+		toolboxManagerEditing = editing;
+		toolboxManagerOpen = true;
 	}
 	let showSearchDialog = $state(false);
 	let showPlotOptionsDialog = $state(false);
@@ -1339,7 +1339,7 @@
 			{#snippet actions()}
 				<button
 					class="icon-btn ghost"
-					onclick={() => openToolboxWizard()}
+					onclick={() => openToolboxManager()}
 					use:tooltip={'Toolboxes'}
 					aria-label="Toolboxes"
 				>
@@ -1506,11 +1506,11 @@
 	<!-- Keyboard Shortcuts Dialog -->
 	<KeyboardShortcutsDialog open={showKeyboardShortcuts} onClose={() => showKeyboardShortcuts = false} />
 
-	<!-- Toolbox Wizard -->
-	<ToolboxWizardDialog
-		open={toolboxWizardOpen}
-		editing={toolboxWizardEditing}
-		onClose={() => { toolboxWizardOpen = false; toolboxWizardEditing = null; }}
+	<!-- Toolbox Manager -->
+	<ToolboxManagerDialog
+		open={toolboxManagerOpen}
+		editing={toolboxManagerEditing}
+		onClose={() => { toolboxManagerOpen = false; toolboxManagerEditing = null; }}
 	/>
 	<SearchDialog open={showSearchDialog} onClose={() => showSearchDialog = false} />
 	<PlotOptionsDialog open={showPlotOptionsDialog} onClose={() => showPlotOptionsDialog = false} traces={resultTraces} />

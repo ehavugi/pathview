@@ -73,7 +73,7 @@
 	let displayNameInput = $state('');
 	let eventsImportPathInput = $state('');
 
-	// Build artifact across the wizard
+	// Build artifact across the add-toolbox flow
 	let resolvedSource = $state<ToolboxSource | null>(null);
 	let resolvedImportPath = $state('');
 	let resolvedDisplayName = $state('');
@@ -335,7 +335,7 @@
 		return TOOLBOX_CATALOG.filter((e) => !installedIds.has(e.id) && !builtInIds.has(e.id));
 	});
 
-	// Dot index across the wizard flow (manager view = no progress dots)
+	// Dot index across the add-toolbox flow (manager view = no progress dots)
 	const dotIndex = $derived(
 		step === 'source' ? 0 : step === 'trust' ? 1 : step === 'install' ? 2 : step === 'select' ? 3 : step === 'customize' ? 4 : -1
 	);
@@ -354,14 +354,14 @@
 {#if open}
 	<div class="dialog-backdrop" transition:fade={{ duration: 150 }} onclick={handleBackdrop} role="presentation">
 		<div
-			class="dialog glass-panel wizard"
+			class="dialog glass-panel manager-modal"
 			transition:scale={{ start: 0.95, duration: 150, easing: cubicOut }}
 			role="dialog"
 			aria-modal="true"
-			aria-labelledby="wizard-title"
+			aria-labelledby="manager-title"
 		>
 			<div class="dialog-header">
-				<span id="wizard-title">
+				<span id="manager-title">
 					{#if step === 'manager'}Toolbox manager{:else}Add toolbox{/if}
 				</span>
 				{#if step === 'source'}
@@ -379,7 +379,7 @@
 				</div>
 			</div>
 
-			<div class="wizard-body">
+			<div class="manager-body">
 				{#if step === 'manager'}
 					<div class="manager">
 						{#if installed.length === 0 && builtInCatalog.length === 0}
@@ -678,7 +678,7 @@
 			</div>
 
 			{#if dotIndex >= 0}
-				<div class="wizard-footer">
+				<div class="manager-footer">
 					<div class="step-dots">
 						{#each Array(5) as _, i}
 							<span class="step-dot" class:active={i === dotIndex} class:done={i < dotIndex}></span>
@@ -694,7 +694,7 @@
 	/* Uses global .dialog-backdrop, .dialog-header, .glass-panel, .icon-btn,
 	   .ghost button, default button, input/select/textarea from app.css */
 
-	.wizard {
+	.manager-modal {
 		width: 90%;
 		max-width: 560px;
 		max-height: 80vh;
@@ -703,7 +703,7 @@
 		overflow: hidden;
 	}
 
-	.wizard-body {
+	.manager-body {
 		flex: 1;
 		min-height: 0;
 		padding: var(--space-md) var(--space-lg);
@@ -713,7 +713,7 @@
 		gap: var(--space-md);
 	}
 
-	.wizard-footer {
+	.manager-footer {
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
