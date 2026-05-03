@@ -1172,6 +1172,24 @@
 
 		<!-- Help -->
 		<div class="toolbar-group">
+			<button
+				class="toolbar-btn"
+				class:active={showPinnedPreviews}
+				onclick={() => pinnedPreviewsStore.toggle()}
+				use:tooltip={{ text: "Pin Previews", shortcut: "P" }}
+				aria-label="Pin Previews"
+			>
+				<Icon name={showPinnedPreviews ? "pin-filled" : "pin"} size={16} />
+			</button>
+			<button
+				class="toolbar-btn"
+				bind:this={themeToggleBtn}
+				onclick={(e) => toggleThemeWithTransition(e)}
+				use:tooltip={{ text: currentTheme === 'dark' ? 'Light mode' : 'Dark mode', shortcut: "T" }}
+				aria-label="Toggle theme"
+			>
+				<Icon name={currentTheme === 'dark' ? 'sun' : 'moon'} size={16} />
+			</button>
 			<button class="toolbar-btn" onclick={() => showKeyboardShortcuts = true} use:tooltip={{ text: "Shortcuts", shortcut: "?" }} aria-label="Keyboard shortcuts">
 				<Icon name="keyboard" size={16} />
 			</button>
@@ -1263,27 +1281,6 @@
 			</button>
 		</div>
 
-		<!-- UI preferences -->
-		<div class="toggle-group">
-			<button
-				class="toggle-btn"
-				class:active={showPinnedPreviews}
-				onclick={() => pinnedPreviewsStore.toggle()}
-				use:tooltip={{ text: "Pin Previews", shortcut: "P", position: "right" }}
-				aria-label="Pin Previews"
-			>
-				<Icon name={showPinnedPreviews ? "pin-filled" : "pin"} size={18} />
-			</button>
-			<button
-				class="toggle-btn"
-				bind:this={themeToggleBtn}
-				onclick={(e) => toggleThemeWithTransition(e)}
-				use:tooltip={{ text: currentTheme === 'dark' ? 'Light mode' : 'Dark mode', shortcut: "T", position: "right" }}
-				aria-label="Toggle theme"
-			>
-				<Icon name={currentTheme === 'dark' ? 'sun' : 'moon'} size={18} />
-			</button>
-		</div>
 	</div>
 
 	<!-- Simulation Settings Panel (floating right) -->
