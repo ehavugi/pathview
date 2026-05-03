@@ -1,0 +1,217 @@
+/**
+ * Convert introspected toolbox metadata into registry definitions and apply
+ * the user's per-block overrides.
+ *
+ * One toolbox = one source id in the registry. Registering replaces, and
+ * `unregisterSource(id)` is the clean uninstall path.
+ */
+
+import { defineNode } from '$lib/nodes/defineNode';
+import { nodeRegistry } from '$lib/nodes/registry';
+import type { ParamType } from '$lib/nodes/types';
+import { eventRegistry } from '$lib/events/registry';
+import type {
+	EventParamDefinition,
+	EventParamType,
+	EventTypeDefinition
+} from '$lib/types/events';
+import {
+	installPackage,
+	loadInlineModule,
+	introspectBlocks,
+	introspectEvents,
+	uninstallModule,
+	type IntrospectedBlock,
+	type IntrospectedEvent
+} from './installer';
+import type { BlockSelection, EventSelection, ToolboxConfig } from './types';
+
+/**
+ * Resolve the port shape from introspected `input_port_labels` / `output_port_labels`.
+ * Same semantics as the build-time pipeline.
+ */
+function resolvePorts(
+	labels: Record<string, number> | string[] | null | undefined
+): { ports: string[] | undefined; max: number | null } {
+	if (labels === null || labels === undefined) {
+		return { ports: undefined, max: null }; // variable
+	}
+	if (Array.isArray(labels)) {
+		if (labels.length === 0) return { ports: [], max: 0 };
+		return { ports: labels, max: labels.length };
+	}
+	// Dict {name: index}
+	const entries = Object.entries(labels);
+	if (entries.length === 0) return { ports: [], max: 0 };
+	entries.sort((a, b) => (a[1] as number) - (b[1] as number));
+	const ports = entries.map(([name]) => name);
+	return { ports, max: ports.length };
+}
+
+function asParamType(t: string): ParamType {
+	if (t === 'number' || t === 'string' || t === 'bool' || t === 'array' || t === 'object') {
+		return t as ParamType;
+	}
+	return 'string';
+}
+
+function asEventParamType(t: string): EventParamType {
+	if (t === 'number' || t === 'string' || t === 'callable' || t === 'array') {
+		return t as EventParamType;
+	}
+	return 'string';
+}
+
+/** Build a node definition from one introspected block + the user's selection. */
+function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelection, fallbackCategory: string) {
+	const { ports: inputs, max: maxInputs } = resolvePorts(block.inputs);
+	const { ports: outputs, max: maxOutputs } = resolvePorts(block.outputs);
+
+	const params: Record<string, { type: ParamType; default: unknown }> = {};
+	for (const p of block.params) {
+		params[p.name] = { type: asParamType(p.type), default: p.default };
+	}
+
+	const definition = defineNode({
+		name: selection.override?.name ?? block.className,
+		category: selection.override?.category ?? fallbackCategory,
+		blockClass: block.className,
+		description: block.description,
+		inputs,
+		outputs,
+		maxInputs,
+		maxOutputs,
+		shape: selection.override?.shape,
+		params
+	});
+
+	// Apply optional default color (used when instantiating fresh nodes).
+	if (selection.override?.color) {
+		(definition as unknown as { defaultColor?: string }).defaultColor = selection.override.color;
+	}
+
+	return definition;
+}
+
+function buildEventDefinition(event: IntrospectedEvent, selection: EventSelection, importPath: string): EventTypeDefinition {
+	const params: EventParamDefinition[] = event.params.map((p) => ({
+		name: p.name,
+		type: asEventParamType(p.type),
+		default: p.default
+	}));
+	return {
+		type: `${importPath}.${event.className}`,
+		name: selection.override?.name ?? event.className,
+		description: event.description,
+		params,
+		eventClass: event.className
+	};
+}
+
+/**
+ * Run the source-specific install step (PyPI / URL / inline) and return the
+ * importPath that introspection should use afterwards. The caller is
+ * responsible for persisting the toolbox config.
+ */
+export async function performInstall(
+	source: ToolboxConfig['source'],
+	requestedImportPath?: string
+): Promise<{ importPath: string }> {
+	if (source.type === 'pypi') {
+		const spec = source.version ? `${source.pkg}==${source.version}` : source.pkg;
+		await installPackage(spec);
+		// Default to the package name with `_` if caller didn't specify.
+		const importPath = requestedImportPath ?? source.pkg.replace(/-/g, '_');
+		return { importPath };
+	}
+	if (source.type === 'url') {
+		await installPackage(source.url);
+		if (!requestedImportPath) {
+			throw new Error('importPath is required when installing from URL');
+		}
+		return { importPath: requestedImportPath };
+	}
+	if (source.type === 'inline') {
+		const baseName = source.filename.replace(/\.py$/, '').replace(/[^A-Za-z0-9_]/g, '_');
+		const moduleName = await loadInlineModule(baseName, source.code);
+		return { importPath: moduleName };
+	}
+	if (source.type === 'curated') {
+		throw new Error('Curated catalog install not implemented yet');
+	}
+	throw new Error(`Unknown toolbox source type: ${(source as { type: string }).type}`);
+}
+
+/**
+ * Run introspection for a configured toolbox. The toolbox must already be
+ * installed (importable). Returns the raw introspection data so the caller
+ * can present it in the wizard (e.g. for selection step).
+ */
+export async function discoverToolbox(config: {
+	importPath: string;
+	eventsImportPath?: string;
+}): Promise<{ blocks: IntrospectedBlock[]; events: IntrospectedEvent[] }> {
+	const blocks = await introspectBlocks(config.importPath);
+	let events: IntrospectedEvent[] = [];
+	if (config.eventsImportPath) {
+		try {
+			events = await introspectEvents(config.eventsImportPath);
+		} catch {
+			events = []; // Events submodule is optional.
+		}
+	}
+	return { blocks, events };
+}
+
+/**
+ * Register the user's selected blocks/events under the toolbox source id.
+ * Replaces any previous registration for the same toolbox id.
+ *
+ * `categoryByClass` lets the toolbox config pin a default category per
+ * class (used when the selection has no explicit override).
+ */
+export async function registerToolbox(
+	config: ToolboxConfig,
+	options: {
+		blocks: IntrospectedBlock[];
+		events: IntrospectedEvent[];
+		categoryByClass?: Record<string, string>;
+	}
+): Promise<void> {
+	// Clear any prior registrations for this id.
+	nodeRegistry.unregisterSource(config.id);
+	eventRegistry.unregisterSource(config.id);
+
+	const blocksByClass = new Map(options.blocks.map((b) => [b.className, b]));
+	const eventsByClass = new Map(options.events.map((e) => [e.className, e]));
+
+	for (const sel of config.blocks) {
+		if (!sel.enabled) continue;
+		const block = blocksByClass.get(sel.className);
+		if (!block || block.error) continue;
+		const fallbackCategory = options.categoryByClass?.[sel.className] ?? config.displayName;
+		const def = buildBlockDefinition(block, sel, fallbackCategory);
+		nodeRegistry.register(def, config.id);
+	}
+
+	for (const sel of config.events) {
+		if (!sel.enabled) continue;
+		const event = eventsByClass.get(sel.className);
+		if (!event) continue;
+		const importPath = config.eventsImportPath ?? config.importPath;
+		const def = buildEventDefinition(event, sel, importPath);
+		eventRegistry.register(def, config.id);
+	}
+}
+
+/** Clean up a toolbox: drop registry entries and the Python module. */
+export async function uninstallToolbox(config: ToolboxConfig): Promise<void> {
+	nodeRegistry.unregisterSource(config.id);
+	eventRegistry.unregisterSource(config.id);
+	try {
+		await uninstallModule(config.importPath);
+		if (config.eventsImportPath) await uninstallModule(config.eventsImportPath);
+	} catch {
+		// Best-effort: dropping from sys.modules is cosmetic at runtime.
+	}
+}

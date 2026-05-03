@@ -33,3 +33,10 @@ export {
 	type IntrospectedBlock,
 	type IntrospectedEvent
 } from './installer';
+
+export {
+	performInstall,
+	discoverToolbox,
+	registerToolbox,
+	uninstallToolbox
+} from './register';

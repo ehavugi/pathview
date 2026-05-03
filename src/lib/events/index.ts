@@ -4,4 +4,4 @@
 
 export * from './types';
 export * from './definitions';
-export { eventRegistry } from './registry';
+export { eventRegistry, eventRegistryVersion, BUILTIN_EVENT_SOURCE } from './registry';
