@@ -531,12 +531,11 @@
 					{/if}
 				{:else if step === 'trust'}
 					<div class="trust">
-						<div class="warning-icon"><Icon name="zap" size={20} /></div>
 						<h3>You're about to run third-party code</h3>
 						<p>
 							PathView will install <strong>{resolvedDisplayName}</strong> and import it into Pyodide. The code runs
-							in your browser, sandboxed inside this tab — but it can still make network requests, read clipboard
-							data, or consume CPU/memory.
+							in your browser, sandboxed inside this tab, but it can still make network requests, read clipboard
+							data, or consume CPU and memory.
 						</p>
 						<p>Only continue if you trust the source.</p>
 						<div class="source-recap">
@@ -813,7 +812,7 @@
 	.installed-name {
 		font-size: var(--font-md);
 		font-weight: 600;
-		color: var(--text);
+		color: var(--text-muted);
 	}
 
 	.installed-source {
@@ -839,7 +838,7 @@
 
 	.add-row:hover {
 		background: var(--surface-hover);
-		color: var(--text);
+		color: var(--text-muted);
 		border-color: var(--border-focus);
 	}
 
@@ -873,7 +872,7 @@
 	.header-tab:hover {
 		background: var(--surface-hover);
 		border-color: var(--border-focus);
-		color: var(--text);
+		color: var(--text-muted);
 	}
 
 	.header-tab.active {
@@ -908,7 +907,7 @@
 	.catalog-name {
 		font-weight: 600;
 		font-size: var(--font-md);
-		color: var(--text);
+		color: var(--text-muted);
 	}
 
 	.catalog-desc {
@@ -990,7 +989,7 @@
 	.trust h3 {
 		margin: 0;
 		font-size: var(--font-lg);
-		color: var(--text);
+		color: var(--text-muted);
 		font-weight: 600;
 	}
 
@@ -999,17 +998,6 @@
 		color: var(--text-muted);
 		font-size: var(--font-md);
 		line-height: 1.5;
-	}
-
-	.warning-icon {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--warning) 20%, transparent);
-		color: var(--warning);
 	}
 
 	.source-recap {
@@ -1022,14 +1010,14 @@
 
 	.source-recap code {
 		font-family: var(--font-mono);
-		color: var(--text);
+		color: var(--text-muted);
 	}
 
 	.spinner-row {
 		display: flex;
 		align-items: center;
 		gap: var(--space-md);
-		color: var(--text);
+		color: var(--text-muted);
 		font-size: var(--font-md);
 	}
 
@@ -1069,7 +1057,7 @@
 		border-radius: var(--radius-sm);
 		font-family: var(--font-mono);
 		font-size: var(--font-base);
-		color: var(--text);
+		color: var(--text-muted);
 		white-space: pre-wrap;
 		word-break: break-word;
 	}
@@ -1103,7 +1091,7 @@
 		align-items: center;
 		padding: var(--space-xs) var(--space-sm);
 		font-size: var(--font-md);
-		color: var(--text);
+		color: var(--text-muted);
 		border-bottom: 1px solid var(--border);
 	}
 
@@ -1166,7 +1154,7 @@
 		border-radius: 0;
 		text-align: left;
 		font-size: var(--font-md);
-		color: var(--text);
+		color: var(--text-muted);
 		cursor: pointer;
 	}
 
