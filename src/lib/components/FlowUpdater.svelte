@@ -65,7 +65,7 @@
 		}
 
 		// Add some padding around the nodes themselves
-		const nodePadding = 20;
+		const nodePadding = 10;
 		minX -= nodePadding;
 		minY -= nodePadding;
 		maxX += nodePadding;

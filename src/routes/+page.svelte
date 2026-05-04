@@ -380,20 +380,20 @@
 
 		// Right panels: Code Editor or Simulation (Properties)
 		const rightPanelWidth = showCodeEditor ? codeEditorWidth : showProperties ? propertiesPanelWidth : 0;
-		const rightPx = (rightPanelWidth > 0 ? rightPanelWidth + PANEL_GAP : 0) + 20; // 20px extra buffer
+		const rightPx = (rightPanelWidth > 0 ? rightPanelWidth + PANEL_GAP : 0) + 10;
 
 		// Bottom panels: Plot and Console - only use heights of panels that are actually open
-		let bottomPx = 20;
+		let bottomPx = 10;
 		if (showPlot && showConsole) {
-			bottomPx = Math.max(plotPanelHeight, consolePanelHeight) + PANEL_GAP + 20;
+			bottomPx = Math.max(plotPanelHeight, consolePanelHeight) + PANEL_GAP + 10;
 		} else if (showPlot) {
-			bottomPx = plotPanelHeight + PANEL_GAP + 20;
+			bottomPx = plotPanelHeight + PANEL_GAP + 10;
 		} else if (showConsole) {
-			bottomPx = consolePanelHeight + PANEL_GAP + 20;
+			bottomPx = consolePanelHeight + PANEL_GAP + 10;
 		}
 
 		// Top: Navigation bar
-		const topPx = NAV_HEIGHT + 20; // 20px extra buffer
+		const topPx = NAV_HEIGHT + 10;
 
 		setFitViewPadding({
 			top: topPx,
