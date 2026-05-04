@@ -624,6 +624,17 @@ export function backlashSamples(): Sample[] {
 
 /* --- Scope-style display signals --------------------------------------- */
 
+/** Growing cosine — second oscilloscope channel (start at peak, amplitude grows) */
+export function growingCosine(growth = 0.01, cycles = 4.5, n = 140): Sample[] {
+	const out: Sample[] = [];
+	for (let i = 0; i < n; i++) {
+		const t = i / (n - 1);
+		const env = Math.exp(growth * 2 * Math.PI * cycles * t);
+		out.push([t, env * Math.cos(2 * Math.PI * cycles * t)]);
+	}
+	return out;
+}
+
 export function dampedOscillation(zeta = 0.06, cycles = 2.5, t0 = 0.05, n = 140): Sample[] {
 	const out: Sample[] = [];
 	for (let i = 0; i < n; i++) {

@@ -3,6 +3,7 @@
 
 	interface Props {
 		samples: Sample[];
+		samples2?: Sample[];
 		yRange?: [number, number];
 		/** Number of vertical grid divisions */
 		gridX?: number;
@@ -10,7 +11,7 @@
 		gridY?: number;
 	}
 
-	let { samples, yRange = [-1.1, 1.1], gridX = 4, gridY = 3 }: Props = $props();
+	let { samples, samples2, yRange = [-1.1, 1.1], gridX = 4, gridY = 3 }: Props = $props();
 
 	// Screen frame box (slightly larger than default plot box for scope feel)
 	const FRAME = { x0: 5, x1: 91, y0: 6, y1: 58 } as const;
@@ -32,11 +33,13 @@
 		return plotY1 - norm * (plotY1 - plotY0);
 	}
 
-	const path = $derived(
-		samples
+	function pathFor(s: Sample[]): string {
+		return s
 			.map(([t, v], i) => `${i === 0 ? 'M' : 'L'} ${localMapX(t).toFixed(2)} ${localMapY(v).toFixed(2)}`)
-			.join(' ')
-	);
+			.join(' ');
+	}
+	const path = $derived(pathFor(samples));
+	const path2 = $derived(samples2 ? pathFor(samples2) : '');
 
 	const gridXLines = $derived(
 		Array.from({ length: gridX - 1 }, (_, i) => FRAME.x0 + ((i + 1) * W) / gridX)
@@ -49,7 +52,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" fill="none" stroke="currentColor"
 	stroke-linecap="round" stroke-linejoin="round">
 	<!-- Outer screen frame -->
-	<rect x={FRAME.x0} y={FRAME.y0} width={W} height={H} rx="3" stroke-width="2" />
+	<rect x={FRAME.x0} y={FRAME.y0} width={W} height={H} rx="3" stroke-width="1.5" />
 	<!-- Grid -->
 	<g stroke-width="0.6" opacity="0.4">
 		{#each gridXLines as gx}
@@ -59,8 +62,11 @@
 			<line x1={FRAME.x0 + 1} y1={gy} x2={FRAME.x1 - 1} y2={gy} />
 		{/each}
 	</g>
-	<!-- Signal trace -->
-	<path d={path} stroke-width="2" />
+	<!-- Signal traces -->
+	<path d={path} stroke-width="1.5" />
+	{#if path2}
+		<path d={path2} stroke-width="1.5" stroke-dasharray="4 4" stroke-dashoffset="2" />
+	{/if}
 </svg>
 
 <style>

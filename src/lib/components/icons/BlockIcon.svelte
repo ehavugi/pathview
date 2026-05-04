@@ -47,7 +47,13 @@
 				decoration={def.decoration}
 			/>
 		{:else if def.kind === 'scope'}
-			<IconScope samples={def.samples()} yRange={def.yRange} gridX={def.gridX} gridY={def.gridY} />
+			<IconScope
+				samples={def.samples()}
+				samples2={def.samples2?.()}
+				yRange={def.yRange}
+				gridX={def.gridX}
+				gridY={def.gridY}
+			/>
 		{:else if def.kind === 'surface'}
 			<IconSurface fn={def.fn} rows={def.rows} cols={def.cols} />
 		{:else if def.kind === 'math'}

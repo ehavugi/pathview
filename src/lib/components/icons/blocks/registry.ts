@@ -16,7 +16,7 @@ type AxesMode = 'none' | 'baseline' | 'cross';
 
 export type IconDef =
 	| { kind: 'plot'; samples: () => Sample[]; xRange?: [number, number]; yRange?: [number, number]; axes?: AxesMode; markers?: boolean; decoration?: 'arrow-up' | 'arrow-down' }
-	| { kind: 'scope'; samples: () => Sample[]; yRange?: [number, number]; gridX?: number; gridY?: number }
+	| { kind: 'scope'; samples: () => Sample[]; samples2?: () => Sample[]; yRange?: [number, number]; gridX?: number; gridY?: number }
 	| { kind: 'surface'; fn?: (u: number, v: number) => number; rows?: number; cols?: number }
 	| { kind: 'math'; latex: string; fit?: number }
 	| { kind: 'glyph'; text: string; size?: number }
@@ -114,7 +114,14 @@ export const iconRegistry: Record<string, IconDef> = {
 	LogicNot: { kind: 'svg', name: 'LogicNot' },
 	Switch: { kind: 'svg', name: 'Switch' },
 	Subsystem: { kind: 'svg', name: 'Subsystem' },
-	Scope: { kind: 'scope', samples: () => C.dampedOscillation(), yRange: [-1.05, 1.05], gridX: 0, gridY: 0 },
+	Scope: {
+		kind: 'scope',
+		samples: () => C.dampedOscillation(),
+		samples2: () => C.growingCosine(0.008).map(([t, v]) => [t, v * 0.65]),
+		yRange: [-1.05, 1.05],
+		gridX: 0,
+		gridY: 0
+	},
 	Spectrum: { kind: 'scope', samples: () => C.spectrumBars(), yRange: [0, 1], gridX: 0, gridY: 0 }
 };
 

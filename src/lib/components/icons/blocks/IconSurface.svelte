@@ -78,8 +78,8 @@
 
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" fill="none" stroke="currentColor"
 	stroke-linecap="round" stroke-linejoin="round">
-	<path d={innerPath} stroke-width="2" />
-	<path d={boundaryPath} stroke-width="2" />
+	<path d={innerPath} stroke-width="1.5" />
+	<path d={boundaryPath} stroke-width="1.5" />
 </svg>
 
 <style>

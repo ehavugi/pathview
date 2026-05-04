@@ -35,7 +35,7 @@
 </script>
 
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" fill="none" stroke="currentColor"
-	stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 	{#if axes === 'baseline' || axes === 'cross'}
 		<line x1={AXIS_BOX.x0} y1={xAxisY} x2={AXIS_BOX.x1} y2={xAxisY} />
 	{/if}
