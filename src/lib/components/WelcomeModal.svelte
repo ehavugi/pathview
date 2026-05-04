@@ -173,9 +173,9 @@
 		top: 0;
 		left: 0;
 		bottom: 0;
-		width: 58vw;
-		max-width: 760px;
-		min-width: 460px;
+		width: 64vw;
+		max-width: 900px;
+		min-width: 480px;
 		background: var(--surface);
 		box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
 		z-index: calc(var(--z-modal) + 1);
@@ -202,7 +202,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-		overflow-y: auto;
 	}
 
 	.version-info {
@@ -283,6 +282,11 @@
 		grid-auto-rows: min-content;
 		align-items: start;
 		gap: 10px;
+		overflow-y: auto;
+		min-height: 0;
+		flex: 1;
+		margin-right: -40px;
+		padding-right: 8px;
 	}
 
 	.example-card {
