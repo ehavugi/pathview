@@ -285,8 +285,10 @@
 		overflow-y: auto;
 		min-height: 0;
 		flex: 1;
-		margin-right: -40px;
-		padding-right: 8px;
+		/* Padding so card shadows aren't clipped by overflow; matching negative
+		   margins keep the layout box the same size. */
+		padding: 12px;
+		margin: -12px -52px 0 -12px;
 	}
 
 	.example-card {
