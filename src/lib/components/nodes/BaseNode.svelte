@@ -9,6 +9,8 @@
 	import { historyStore } from '$lib/stores/history';
 	import { pinnedPreviewsStore } from '$lib/stores/pinnedPreviews';
 	import { portLabelsStore } from '$lib/stores/portLabels';
+	import { iconModeStore } from '$lib/stores/iconMode';
+	import BlockIcon, { hasBlockIcon } from '$lib/components/icons/BlockIcon.svelte';
 	import { hoveredHandle, selectedNodeHighlight } from '$lib/stores/hoveredHandle';
 	import { showTooltip, hideTooltip } from '$lib/components/Tooltip.svelte';
 	import { paramInput } from '$lib/actions/paramInput';
@@ -66,9 +68,21 @@
 		globalShowPortLabels = value;
 	});
 
+	// Global icon mode (icon vs text)
+	let globalIconMode = $state(false);
+	const unsubscribeIconMode = iconModeStore.subscribe((value) => {
+		globalIconMode = value;
+	});
+
 	// Per-node overrides (undefined = follow global)
 	const nodeShowInputLabels = $derived(data.params?.['_showInputLabels'] as boolean | undefined);
 	const nodeShowOutputLabels = $derived(data.params?.['_showOutputLabels'] as boolean | undefined);
+	const nodeIconMode = $derived(data.params?.['_iconMode'] as boolean | undefined);
+
+	// Effective icon-mode and whether an icon exists for this block class
+	const effectiveIconMode = $derived(nodeIconMode ?? globalIconMode);
+	const blockIconKey = $derived(typeDef?.blockClass ?? typeDef?.type);
+	const showIcon = $derived(effectiveIconMode && hasBlockIcon(blockIconKey));
 
 	// Effective visibility settings (per-node overrides global)
 	const showInputLabels = $derived(nodeShowInputLabels ?? globalShowPortLabels);
@@ -89,10 +103,17 @@
 		}
 	});
 
+	// Re-measure when icon-mode flips
+	$effect(() => {
+		void showIcon;
+		updateNodeInternals(id);
+	});
+
 	onDestroy(() => {
 		unsubscribePinned();
 		unsubscribePlotData();
 		unsubscribePortLabels();
+		unsubscribeIconMode();
 		if (hoverTimeout) clearTimeout(hoverTimeout);
 	});
 
@@ -228,7 +249,8 @@
 		typeDef?.name,
 		hasVisibleInputLabels,
 		hasVisibleOutputLabels,
-		measuredName
+		measuredName,
+		showIcon
 	));
 
 	// Grid layout for port labels (computed in JS, replaces CSS grid-placement selectors)
@@ -513,13 +535,17 @@
 		<!-- Inner wrapper for content -->
 		<div class="node-inner" style={gridLayout().innerStyle}>
 			<!-- Node content -->
-			<div class="node-content">
+			<div class="node-content" class:has-icon={showIcon}>
 				{#if renderedNameHtml}
 					<span class="node-name">{@html renderedNameHtml}</span>
 				{:else}
 					<span class="node-name">{data.name}</span>
 				{/if}
-				{#if typeDef}
+				{#if showIcon}
+					<div class="node-icon">
+						<BlockIcon blockClass={blockIconKey} title={typeDef?.name} />
+					</div>
+				{:else if typeDef}
 					<span class="node-type">{typeDef.name}</span>
 				{:else if data.type !== NODE_TYPES.SUBSYSTEM && data.type !== NODE_TYPES.INTERFACE}
 					<span class="node-type missing">{data.type} (missing)</span>
@@ -759,6 +785,34 @@
 		font-size: 8px;
 		color: var(--text-muted);
 		margin-top: 2px;
+	}
+
+	.node-content.has-icon {
+		padding: 2px 4px 4px;
+	}
+
+	.node-content.has-icon .node-name {
+		font-size: 9px;
+		font-weight: 500;
+	}
+
+	.node-icon {
+		flex: 1;
+		min-height: 0;
+		max-height: 42px;
+		margin-top: 1px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--node-color);
+	}
+
+	.node-icon :global(svg) {
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
+		display: block;
 	}
 
 	.node-type.missing {
