@@ -9,24 +9,23 @@
 	let { latex }: Props = $props();
 	let html = $state<string>('');
 	let inner: HTMLSpanElement | undefined = $state();
+	let wrap: HTMLSpanElement | undefined = $state();
 	let scale = $state(1);
 
-	const VIEW_W = 96;
-	const VIEW_H = 64;
-	const PADDING = 4;
-	const FREE_W = VIEW_W - 2 * PADDING;
-	const FREE_H = VIEW_H - 2 * PADDING;
-
 	const MAX_SCALE = 1.6;
-	const MIN_SCALE = 0.95;
+	const MIN_SCALE = 0.4;
+	const PADDING_X = 6;
+	const PADDING_Y = 4;
 
 	async function measure() {
 		await tick();
-		if (!inner) return;
+		if (!inner || !wrap) return;
+		const cw = wrap.clientWidth - 2 * PADDING_X;
+		const ch = wrap.clientHeight - 2 * PADDING_Y;
 		const w = inner.scrollWidth;
 		const h = inner.scrollHeight;
-		if (w === 0 || h === 0) return;
-		const fitScale = Math.min(FREE_W / w, FREE_H / h);
+		if (w === 0 || h === 0 || cw <= 0 || ch <= 0) return;
+		const fitScale = Math.min(cw / w, ch / h);
 		scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale));
 	}
 
@@ -48,36 +47,32 @@
 	$effect(() => {
 		if (html) measure();
 	});
+
+	$effect(() => {
+		if (!wrap) return;
+		const ro = new ResizeObserver(() => measure());
+		ro.observe(wrap);
+		return () => ro.disconnect();
+	});
 </script>
 
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEW_W} {VIEW_H}">
-	<foreignObject x="-32" y="-32" width={VIEW_W + 64} height={VIEW_H + 64}>
-		<div class="wrap">
-			<span class="inner" bind:this={inner} style="transform: scale({scale});">
-				{#if html}
-					{@html html}
-				{/if}
-			</span>
-		</div>
-	</foreignObject>
-</svg>
+<span class="math" bind:this={wrap}>
+	<span class="inner" bind:this={inner} style="transform: scale({scale});">
+		{#if html}
+			{@html html}
+		{/if}
+	</span>
+</span>
 
 <style>
-	svg {
-		width: 100%;
-		height: 100%;
-		display: block;
-		color: currentColor;
-		overflow: visible;
-	}
-
-	.wrap {
+	.math {
 		width: 100%;
 		height: 100%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: inherit;
+		color: currentColor;
+		overflow: visible;
 	}
 
 	.inner {
@@ -93,6 +88,16 @@
 
 	.inner :global(.katex) {
 		font-size: 16px;
+		font-weight: 600;
 		color: inherit;
+	}
+
+	.inner :global(.katex .mord),
+	.inner :global(.katex .mop),
+	.inner :global(.katex .mbin),
+	.inner :global(.katex .mrel),
+	.inner :global(.katex .mathnormal),
+	.inner :global(.katex .mathit) {
+		font-weight: 600;
 	}
 </style>
