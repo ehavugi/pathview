@@ -11,6 +11,7 @@
 	import { portLabelsStore } from '$lib/stores/portLabels';
 	import { iconModeStore } from '$lib/stores/iconMode';
 	import BlockIcon, { hasBlockIcon } from '$lib/components/icons/BlockIcon.svelte';
+	import { PREVIEW_GAP, previewSideForRotation } from '$lib/utils/previewBounds';
 	import { hoveredHandle, selectedNodeHighlight } from '$lib/stores/hoveredHandle';
 	import { showTooltip, hideTooltip } from '$lib/components/Tooltip.svelte';
 	import { paramInput } from '$lib/actions/paramInput';
@@ -215,19 +216,8 @@
 	// Port is horizontal (left/right) or vertical (top/bottom)
 	const isVertical = $derived(rotation === 1 || rotation === 3);
 
-	// Preview position: opposite side of inputs
-	// rotation 0: inputs left → preview right
-	// rotation 1: inputs top → preview bottom
-	// rotation 2: inputs right → preview left
-	// rotation 3: inputs bottom → preview top
-	const previewPosition = $derived(() => {
-		switch (rotation) {
-			case 1: return 'bottom';
-			case 2: return 'left';
-			case 3: return 'top';
-			default: return 'right';
-		}
-	});
+	// Preview position: opposite side of inputs (rotation → side mapping is in utils)
+	const previewPosition = $derived(() => previewSideForRotation(rotation));
 
 	const maxPortsOnSide = $derived(Math.max(data.inputs.length, data.outputs.length));
 	const pinnedCount = $derived(validPinnedParams().length);
@@ -485,7 +475,7 @@
 	class:show-labels={showPortLabels}
 	class:missing-type={!typeDef && data.type !== NODE_TYPES.SUBSYSTEM && data.type !== NODE_TYPES.INTERFACE}
 	data-rotation={rotation}
-	style="width: {nodeDimensions.width}px; height: {nodeDimensions.height}px; --node-color: {nodeColor};"
+	style="width: {nodeDimensions.width}px; height: {nodeDimensions.height}px; --node-color: {nodeColor}; --preview-gap: {PREVIEW_GAP}px;"
 	ondblclick={handleDoubleClick}
 	onmouseenter={handleMouseEnter}
 	onmouseleave={handleMouseLeave}
@@ -799,7 +789,6 @@
 	.node-icon {
 		flex: 1;
 		min-height: 0;
-		max-height: 42px;
 		margin-top: 1px;
 		display: flex;
 		align-items: center;
@@ -1057,28 +1046,28 @@
 
 	/* Preview position: right (default, inputs on left) */
 	.plot-preview-popup.preview-right {
-		left: calc(100% + 12px);
+		left: calc(100% + var(--preview-gap));
 		top: 50%;
 		transform: translateY(-50%);
 	}
 
 	/* Preview position: left (inputs on right) */
 	.plot-preview-popup.preview-left {
-		right: calc(100% + 12px);
+		right: calc(100% + var(--preview-gap));
 		top: 50%;
 		transform: translateY(-50%);
 	}
 
 	/* Preview position: top (inputs on bottom) */
 	.plot-preview-popup.preview-top {
-		bottom: calc(100% + 12px);
+		bottom: calc(100% + var(--preview-gap));
 		left: 50%;
 		transform: translateX(-50%);
 	}
 
 	/* Preview position: bottom (inputs on top) */
 	.plot-preview-popup.preview-bottom {
-		top: calc(100% + 12px);
+		top: calc(100% + var(--preview-gap));
 		left: 50%;
 		transform: translateX(-50%);
 	}
