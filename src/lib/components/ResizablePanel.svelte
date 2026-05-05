@@ -179,6 +179,7 @@
 <aside
 	class="resizable-panel glass-panel {position}"
 	class:resizing={isResizing}
+	data-panel={title ?? ''}
 	style="
 		{position === 'left' || position === 'right' ? `width: ${getWidth()}px;` : ''}
 		{(position === 'bottom-left' || position === 'bottom-right') && controlledWidth !== undefined ? `width: ${getWidth()}px;` : ''}
