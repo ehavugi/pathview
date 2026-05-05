@@ -127,6 +127,34 @@ def pathview_uninstall(import_path):
     return {"ok": True, "dropped": _pv_drop_module(import_path)}
 
 
+def _pv_module_version(import_path):
+    """Best-effort version lookup for an imported module.
+    Tries module.__version__ first, falls back to importlib.metadata,
+    returns None if nothing works."""
+    try:
+        mod = _pv_importlib.import_module(import_path)
+    except Exception:
+        return None
+    v = getattr(mod, "__version__", None)
+    if isinstance(v, str) and v:
+        return v
+    try:
+        import importlib.metadata as _pv_md
+    except Exception:
+        return None
+    # Walk up the dotted path so submodule imports still resolve to their
+    # owning distribution (e.g. pathsim_chem.blocks → pathsim-chem).
+    parts = import_path.split(".")
+    for i in range(len(parts), 0, -1):
+        candidate = parts[0] if i == 1 else ".".join(parts[:i])
+        for name in (candidate, candidate.replace("_", "-"), candidate.replace("-", "_")):
+            try:
+                return _pv_md.version(name)
+            except Exception:
+                continue
+    return None
+
+
 _pv_helpers_loaded = True
 `;
 

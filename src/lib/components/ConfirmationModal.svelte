@@ -95,6 +95,7 @@
 		font-size: var(--font-sm);
 		color: var(--text-muted);
 		line-height: 1.5;
+		white-space: pre-wrap;
 	}
 
 	.dialog-actions {

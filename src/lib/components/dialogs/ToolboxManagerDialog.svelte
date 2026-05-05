@@ -56,6 +56,7 @@
 	// Build artifact across the add-toolbox flow
 	let resolvedSource = $state<ToolboxSource | null>(null);
 	let resolvedImportPath = $state('');
+	let resolvedInstalledVersion = $state<string | null>(null);
 	let resolvedDisplayName = $state('');
 	let resolvedEventsImportPath = $state<string | undefined>(undefined);
 	let toolboxId = $state('');
@@ -97,6 +98,7 @@
 		eventsImportPathInput = '';
 		resolvedSource = null;
 		resolvedImportPath = '';
+		resolvedInstalledVersion = null;
 		resolvedDisplayName = '';
 		resolvedEventsImportPath = undefined;
 		toolboxId = '';
@@ -200,6 +202,7 @@
 			installMessage = describeInstall(resolvedSource);
 			const result = await performInstall(resolvedSource, resolvedImportPath || undefined);
 			resolvedImportPath = result.importPath;
+			resolvedInstalledVersion = result.installedVersion;
 
 			installStatus = 'discovering';
 			installMessage = `Inspecting ${resolvedImportPath}…`;
@@ -301,6 +304,7 @@
 			source: resolvedSource,
 			importPath: resolvedImportPath,
 			eventsImportPath: resolvedEventsImportPath,
+			installedVersion: resolvedInstalledVersion,
 			blocks: blockSelections,
 			events: eventSelections
 		};
@@ -387,7 +391,10 @@
 								{#each installed as t (t.id)}
 									<div class="installed-row">
 										<div class="installed-meta">
-											<div class="installed-name">{t.displayName}</div>
+											<div class="installed-name">
+												{t.displayName}
+												{#if t.installedVersion}<span class="installed-version">v{t.installedVersion}</span>{/if}
+											</div>
 											<div class="installed-source">
 												{#if t.source.type === 'pypi'}
 													pip · {t.source.pkg}{t.source.version ? `==${t.source.version}` : ''}
@@ -780,6 +787,14 @@
 		font-size: var(--font-md);
 		font-weight: 600;
 		color: var(--text-muted);
+	}
+
+	.installed-version {
+		margin-left: 6px;
+		font-family: var(--font-mono);
+		font-size: var(--font-sm);
+		font-weight: 400;
+		color: var(--text-disabled);
 	}
 
 	.installed-source {

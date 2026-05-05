@@ -29,6 +29,7 @@ import {
 	upsertToolbox,
 	getCatalogEntry
 } from '$lib/toolbox';
+import { getCachedPathsimVersion } from '$lib/toolbox/pathsimVersion';
 import type { ToolboxRequirement } from '$lib/types/schema';
 import { requestAssemblyAnimation } from '$lib/animation/assemblyAnimation';
 import { downloadJson } from '$lib/utils/download';
@@ -97,13 +98,15 @@ export function createGraphFile(name?: string): GraphFile {
 	) as SimulationSettings;
 
 	const requiredToolboxes = collectRequiredToolboxes(nodes);
+	const pathsimVersion = getCachedPathsimVersion();
 
 	return {
 		version: GRAPH_FILE_VERSION,
 		metadata: {
 			created: new Date().toISOString(),
 			modified: new Date().toISOString(),
-			name: name || 'Untitled'
+			name: name || 'Untitled',
+			...(pathsimVersion ? { pathsimVersion } : {})
 		},
 		graph: {
 			nodes: cleanedNodes,
@@ -172,7 +175,13 @@ async function installRequiredToolboxes(reqs: ToolboxRequirement[]): Promise<voi
 	const missing = findMissingRequirements(reqs);
 	if (missing.length === 0) return;
 
-	const list = missing.map((r) => `· ${r.displayName}`).join('\n');
+	// List missing toolboxes with the version recorded in the file as info —
+	// purely transparency so the user knows which version the model was
+	// authored against. Install resolves to whatever's latest; if a user
+	// needs to pin, they can do it manually in the toolbox manager.
+	const list = missing
+		.map((r) => `· ${r.displayName}${r.installedVersion ? ` (saved with v${r.installedVersion})` : ''}`)
+		.join('\n');
 	const ok = await confirmationStore.show({
 		title: 'Install required toolboxes?',
 		message: `This file uses ${missing.length} toolbox${missing.length === 1 ? '' : 'es'} that ${missing.length === 1 ? 'is' : 'are'} not installed:\n\n${list}\n\nInstall now?`,
@@ -204,6 +213,7 @@ async function installRequiredToolboxes(reqs: ToolboxRequirement[]): Promise<voi
 				source: req.source,
 				importPath: updated.importPath,
 				eventsImportPath: updated.eventsImportPath,
+				installedVersion: installResult.installedVersion,
 				blocks: discovered.blocks.map((b) => ({ className: b.className, enabled: true })),
 				events: discovered.events.map((e) => ({ className: e.className, enabled: true }))
 			};

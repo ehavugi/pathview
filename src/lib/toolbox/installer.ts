@@ -36,23 +36,21 @@ export interface IntrospectedEvent {
 	params: IntrospectedParam[];
 }
 
-let helpersLoaded = false;
-
 /**
  * Make sure Pyodide is initialized (so `json` and `_to_json` are available
  * for `evaluate(...)`) and that our toolbox helpers are defined.
+ *
+ * No JS-side cache: pathview wipes Python globals on simulation reset, so
+ * a cached "loaded" flag goes stale and the next call hits a NameError.
+ * The sentinel check is a single evaluate — cheap enough to run every time.
  */
 async function ensureHelpers(): Promise<void> {
-	if (helpersLoaded) return;
-	// initPyodide is idempotent and also runs REPL_SETUP_CODE which imports
-	// `json` and defines `_to_json` — both needed by evaluate().
 	await initPyodide();
 	const present = await evaluate<boolean>(TOOLBOX_HELPERS_SENTINEL);
 	if (!present) {
 		await exec(TOOLBOX_PYTHON_HELPERS);
+		await ensureDocutils();
 	}
-	await ensureDocutils();
-	helpersLoaded = true;
 }
 
 /**
@@ -144,6 +142,20 @@ export async function introspectEvents(importPath: string): Promise<Introspected
 		throw new Error(`Event introspection failed for "${importPath}": ${result.error ?? 'unknown error'}`);
 	}
 	return result.events;
+}
+
+/**
+ * Best-effort version lookup for an installed module. Reads
+ * `module.__version__` first, falls back to `importlib.metadata`. Returns
+ * null when neither is available (typical for inline modules).
+ */
+export async function getModuleVersion(importPath: string): Promise<string | null> {
+	await ensureHelpers();
+	try {
+		return await evaluate<string | null>(`_pv_module_version(${pyStr(importPath)})`);
+	} catch {
+		return null;
+	}
 }
 
 /**

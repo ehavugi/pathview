@@ -163,7 +163,10 @@ function collectBlockImportGroups(nodes: NodeInstance[]): Map<string, Set<string
 		const typeDef = nodeRegistry.get(node.type);
 		if (!typeDef) continue;
 
-		const importPath = blockImportPaths[typeDef.blockClass] || 'pathsim.blocks';
+		// Toolbox-registered blocks carry their own importPath; built-ins
+		// fall back to the static map. Last fallback is core pathsim.blocks.
+		const importPath =
+			typeDef.importPath ?? blockImportPaths[typeDef.blockClass] ?? 'pathsim.blocks';
 		if (!groups.has(importPath)) groups.set(importPath, new Set());
 		groups.get(importPath)!.add(typeDef.blockClass);
 	}
