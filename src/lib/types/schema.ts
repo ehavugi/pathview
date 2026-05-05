@@ -13,6 +13,9 @@ export interface FileMetadata {
 	modified: string;
 	name: string;
 	description?: string;
+	/** Pathsim version installed when the file was saved. Used at load
+	 *  time to warn the user if their pathsim differs significantly. */
+	pathsimVersion?: string | null;
 }
 
 /**
@@ -29,6 +32,10 @@ export interface ToolboxRequirement {
 	source: ToolboxSource;
 	importPath: string;
 	eventsImportPath?: string;
+	/** Version actually installed on the machine that saved this file
+	 *  (read from `module.__version__` / `importlib.metadata`). The loader
+	 *  offers to pin to this version for reproducibility. */
+	installedVersion?: string | null;
 }
 
 /** Shared graph content structure (used by GraphFile and ModelContent) */

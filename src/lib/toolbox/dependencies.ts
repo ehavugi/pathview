@@ -31,7 +31,8 @@ function toRequirement(t: ToolboxConfig): ToolboxRequirement {
 		displayName: t.displayName,
 		source: t.source,
 		importPath: t.importPath,
-		eventsImportPath: t.eventsImportPath
+		eventsImportPath: t.eventsImportPath,
+		installedVersion: t.installedVersion ?? null
 	};
 }
 

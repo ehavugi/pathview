@@ -15,6 +15,7 @@ import { get } from 'svelte/store';
 import { toolboxes, upsertToolbox, seedPreloadedToolboxes } from './store';
 import { performInstall, discoverToolbox, registerToolbox } from './register';
 import { getCatalogEntry } from './catalog';
+import { primePathsimVersion } from './pathsimVersion';
 import type { ToolboxConfig } from './types';
 
 let bootstrapped = false;
@@ -22,6 +23,10 @@ let bootstrapped = false;
 export async function bootstrapToolboxes(): Promise<void> {
 	if (bootstrapped) return;
 	bootstrapped = true;
+
+	// Cache pathsim's version once so createGraphFile (which is sync) can
+	// stamp it into saved files without needing an async hop.
+	await primePathsimVersion();
 
 	seedPreloadedToolboxes();
 
@@ -43,6 +48,7 @@ export async function bootstrapToolboxes(): Promise<void> {
 			const reconciled: ToolboxConfig = {
 				...config,
 				importPath: installResult.importPath,
+				installedVersion: installResult.installedVersion,
 				blocks: discovered.blocks.map(
 					(b) =>
 						config.blocks.find((s) => s.className === b.className) ?? {

@@ -65,6 +65,10 @@ export interface ToolboxConfig {
 	blocks: BlockSelection[];
 	/** Per-event selections + overrides. */
 	events: EventSelection[];
+	/** Version actually installed (read from `module.__version__` or
+	 *  `importlib.metadata`). Populated post-install / post-bootstrap.
+	 *  Distinct from `source.version`, which pins the install spec when set. */
+	installedVersion?: string | null;
 }
 
 /** Versioned envelope persisted to localStorage. */

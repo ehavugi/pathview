@@ -11,6 +11,10 @@ interface DefineNodeOptions {
 	category: NodeCategory;
 	description?: string;
 	blockClass: string; // PathSim class name
+	/** Python module to import `blockClass` from. Optional — built-ins
+	 *  resolve via the static map in `blocks.ts`. Toolbox-registered
+	 *  blocks pass their toolbox `importPath` here. */
+	importPath?: string;
 
 	// Port configuration
 	inputs?: string[]; // Named input ports
@@ -47,6 +51,7 @@ export function defineNode(options: DefineNodeOptions): NodeTypeDefinition {
 		category,
 		description = `${name} block`,
 		blockClass,
+		importPath,
 		inputs = ['in 0'],
 		outputs = ['out 0'],
 		minInputs = 1,
@@ -75,6 +80,7 @@ export function defineNode(options: DefineNodeOptions): NodeTypeDefinition {
 		category,
 		description,
 		blockClass,
+		importPath,
 		shape,
 
 		ports: {

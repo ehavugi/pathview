@@ -135,10 +135,14 @@ export function generateBlockCodeHeader(node: NodeInstance, codeContext: string)
 		const blockClasses = new Set<string>();
 		collectSubsystemBlockClasses(node, blockClasses);
 		if (blockClasses.size > 0) {
-			// Group block classes by import path
+			// Group block classes by import path. Toolbox-registered blocks
+			// carry their own importPath in the typeDef; built-ins fall back
+			// to the static map.
 			const importGroups = new Map<string, string[]>();
 			for (const cls of [...blockClasses].sort()) {
-				const importPath = blockImportPaths[cls] || 'pathsim.blocks';
+				const def = nodeRegistry.get(cls);
+				const importPath =
+					def?.importPath ?? blockImportPaths[cls] ?? 'pathsim.blocks';
 				const group = importGroups.get(importPath) || [];
 				group.push(cls);
 				importGroups.set(importPath, group);
@@ -148,7 +152,8 @@ export function generateBlockCodeHeader(node: NodeInstance, codeContext: string)
 			}
 		}
 	} else {
-		const importPath = blockImportPaths[typeDef.blockClass] || 'pathsim.blocks';
+		const importPath =
+			typeDef.importPath ?? blockImportPaths[typeDef.blockClass] ?? 'pathsim.blocks';
 		lines.push(`from ${importPath} import ${typeDef.blockClass}`);
 	}
 

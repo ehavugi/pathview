@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { Handle, Position, useUpdateNodeInternals } from '@xyflow/svelte';
-	import { nodeRegistry, type NodeInstance } from '$lib/nodes';
+	import { nodeRegistry, registryVersion, type NodeInstance } from '$lib/nodes';
 	import { getShapeCssClass, isSubsystem } from '$lib/nodes/shapes/index';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import { openNodeDialog } from '$lib/stores/nodeDialog';
@@ -33,8 +33,16 @@
 	// Get SvelteFlow hook to trigger re-measurement when node size changes
 	const updateNodeInternals = useUpdateNodeInternals();
 
-	// Get type definition
-	const typeDef = $derived(nodeRegistry.get(data.type));
+	// Get type definition. The registry isn't a reactive store on its own,
+	// so we tick on registryVersion bumps (toolbox install/uninstall) and
+	// re-read here. Without this, blocks loaded before their toolbox finished
+	// bootstrapping would stay stuck rendering as (missing).
+	let registryTick = $state(0);
+	const unsubRegistry = registryVersion.subscribe((v) => (registryTick = v));
+	const typeDef = $derived.by(() => {
+		registryTick; // dependency: re-read whenever the registry version bumps
+		return nodeRegistry.get(data.type);
+	});
 	const category = $derived(typeDef?.category || 'Algebraic');
 
 	// Get valid pinned params (filter out any that no longer exist in the type definition)
@@ -109,6 +117,7 @@
 	});
 
 	onDestroy(() => {
+		unsubRegistry();
 		unsubscribePinned();
 		unsubscribePlotData();
 		unsubscribePortLabels();
@@ -333,7 +342,13 @@
 	const shapeClass = $derived(() => typeDef ? getShapeCssClass(typeDef) : 'shape-default');
 
 	// Custom node color (defaults to pathsim-blue)
-	const nodeColor = $derived(data.color || 'var(--accent)');
+	// Missing blocks (type not registered) override any custom color so the
+	// whole block — name, handles, hover state — picks up the error red.
+	const nodeColor = $derived(
+		!typeDef && data.type !== NODE_TYPES.SUBSYSTEM && data.type !== NODE_TYPES.INTERFACE
+			? 'var(--error)'
+			: data.color || 'var(--accent)'
+	);
 
 	// Handle pinned param change
 	function handlePinnedParamChange(paramName: string, value: string) {
@@ -697,6 +712,9 @@
 		font-size: 8px;
 		color: var(--text-muted);
 		margin-top: 2px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.node-content.has-icon {
@@ -727,19 +745,28 @@
 	}
 
 	.node-type.missing {
-		color: var(--warning);
+		color: var(--error);
+		font-weight: 500;
 	}
 
 	/* Visual marker for nodes whose block type isn't registered (e.g. file
-	   loaded with a toolbox dependency the user hasn't installed). */
+	 * loaded with a toolbox dependency the user hasn't installed). Same
+	 * shape as a normal block, just dressed in error red so it's obvious
+	 * something is wrong. */
 	.node.missing-type {
-		--node-color: var(--warning);
-		opacity: 0.85;
+		--node-color: var(--error);
+		border-color: var(--error);
+		background: var(--error-bg);
 	}
 
-	.node.missing-type .node-content,
-	.node.missing-type :global(.node-shape) {
-		border-style: dashed;
+	/* Port handles: paint the outer pentagon red so the missing block
+	 * carries its error state out to its connections. The inner cutout
+	 * picks up the red-tinted body so it visually merges with the block. */
+	:global(.node.missing-type .svelte-flow__handle::before) {
+		background: var(--error);
+	}
+	:global(.node.missing-type .svelte-flow__handle::after) {
+		background: color-mix(in srgb, var(--error-bg) 60%, var(--surface-raised));
 	}
 
 	/* Pinned parameters - rectangular, clipped by node-clip's overflow:hidden */

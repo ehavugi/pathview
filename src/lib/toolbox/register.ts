@@ -20,6 +20,7 @@ import {
 	loadInlineModule,
 	introspectBlocks,
 	introspectEvents,
+	getModuleVersion,
 	uninstallModule,
 	type IntrospectedBlock,
 	type IntrospectedEvent
@@ -82,7 +83,12 @@ function asShape(value: string | undefined): NodeShape | undefined {
 }
 
 /** Build a node definition from one introspected block + the user's selection. */
-function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelection, fallbackCategory: string) {
+function buildBlockDefinition(
+	block: IntrospectedBlock,
+	selection: BlockSelection,
+	fallbackCategory: string,
+	importPath: string
+) {
 	const { ports: inputs, max: maxInputs } = resolvePorts(block.inputs);
 	const { ports: outputs, max: maxOutputs } = resolvePorts(block.outputs);
 
@@ -99,6 +105,7 @@ function buildBlockDefinition(block: IntrospectedBlock, selection: BlockSelectio
 		name: selection.override?.name ?? block.className,
 		category: selection.override?.category ?? fallbackCategory,
 		blockClass: block.className,
+		importPath,
 		description: block.description,
 		inputs,
 		outputs,
@@ -144,27 +151,27 @@ function buildEventDefinition(event: IntrospectedEvent, selection: EventSelectio
 export async function performInstall(
 	source: ToolboxConfig['source'],
 	requestedImportPath?: string
-): Promise<{ importPath: string }> {
+): Promise<{ importPath: string; installedVersion: string | null }> {
+	let importPath: string;
 	if (source.type === 'pypi') {
 		const spec = source.version ? `${source.pkg}==${source.version}` : source.pkg;
 		// Default to the package name with `_` if caller didn't specify.
-		const importPath = requestedImportPath ?? source.pkg.replace(/-/g, '_');
+		importPath = requestedImportPath ?? source.pkg.replace(/-/g, '_');
 		await installPackage(spec, importPath);
-		return { importPath };
-	}
-	if (source.type === 'url') {
+	} else if (source.type === 'url') {
 		if (!requestedImportPath) {
 			throw new Error('importPath is required when installing from URL');
 		}
 		await installPackage(source.url, requestedImportPath);
-		return { importPath: requestedImportPath };
-	}
-	if (source.type === 'inline') {
+		importPath = requestedImportPath;
+	} else if (source.type === 'inline') {
 		const baseName = source.filename.replace(/\.py$/, '').replace(/[^A-Za-z0-9_]/g, '_');
-		const moduleName = await loadInlineModule(baseName, source.code);
-		return { importPath: moduleName };
+		importPath = await loadInlineModule(baseName, source.code);
+	} else {
+		throw new Error(`Unknown toolbox source type: ${(source as { type: string }).type}`);
 	}
-	throw new Error(`Unknown toolbox source type: ${(source as { type: string }).type}`);
+	const installedVersion = await getModuleVersion(importPath);
+	return { importPath, installedVersion };
 }
 
 /**
@@ -226,7 +233,7 @@ export function registerToolbox(
 			options.categoryByClass?.[sel.className] ??
 			options.defaultCategory ??
 			config.displayName;
-		const def = buildBlockDefinition(block, sel, fallbackCategory);
+		const def = buildBlockDefinition(block, sel, fallbackCategory, config.importPath);
 		nodeRegistry.register(def, config.id);
 	}
 

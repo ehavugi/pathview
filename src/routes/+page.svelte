@@ -507,13 +507,17 @@
 		// Bring up the Python backend the moment the page loads so the
 		// runtime is ready by the time the user clicks Run. Order matters:
 		// detect the active backend first, then initialise it, then run
-		// the toolbox bootstrap on top.
+		// the toolbox bootstrap on top. The URL-param model load runs at
+		// the end so toolbox blocks are registered in nodeRegistry by the
+		// time BaseNode tries to resolve them — otherwise blocks from
+		// installed-but-not-yet-bootstrapped toolboxes render as (missing).
 		(async () => {
 			try {
 				await autoDetectBackend();
 				await initBackendFromUrl();
 				await initPyodide();
 				await bootstrapToolboxes();
+				await loadFromUrlParam();
 			} catch (e) {
 				console.error('[startup]', e);
 			}
@@ -633,9 +637,6 @@
 		};
 		window.addEventListener('run-simulation', handleRunSimulation);
 		window.addEventListener('continue-simulation', handleContinueSimulation);
-
-		// Check for URL parameters to load model
-		loadFromUrlParam();
 
 		return () => {
 			// Cleanup store subscriptions

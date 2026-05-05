@@ -73,6 +73,13 @@ export interface NodeTypeDefinition {
 	// PathSim block class name for export
 	blockClass: string;
 
+	// Python module to import the block class from. Built-in pathsim blocks
+	// can leave this undefined and codegen falls back to the static
+	// `blockImportPaths` map; runtime-toolbox blocks set this to their
+	// toolbox config's importPath so the generated code says
+	// `from pathsim_chem import GLC` instead of `from pathsim.blocks import GLC`.
+	importPath?: string;
+
 	// Full RST docstring from PathSim (for documentation display)
 	docstring?: string;
 
