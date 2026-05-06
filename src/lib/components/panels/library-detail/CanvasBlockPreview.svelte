@@ -84,7 +84,7 @@
 
 	.cbp-name {
 		font-size: 10px;
-		color: var(--text);
+		color: var(--text-muted);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
