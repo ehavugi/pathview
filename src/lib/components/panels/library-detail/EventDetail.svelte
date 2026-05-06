@@ -27,15 +27,17 @@
 </script>
 
 <div class="detail-root">
-	<div class="detail-preview">
-		<EventPreview {event} />
-	</div>
-
-	{#if toolboxLabel}
-		<div class="detail-meta">
-			<span class="toolbox-badge">{toolboxLabel}</span>
+	<div class="detail-section">
+		<div class="section-title">
+			<span class="title-text">{event.name}</span>
+			{#if toolboxLabel}
+				<span class="title-meta">{toolboxLabel}</span>
+			{/if}
 		</div>
-	{/if}
+		<div class="detail-preview">
+			<EventPreview {event} />
+		</div>
+	</div>
 
 	<div class="detail-docs">
 		<DocumentationSection docstringHtml={event.docstringHtml} alwaysExpanded />
@@ -52,37 +54,51 @@
 		overflow: hidden;
 	}
 
-	.detail-preview {
+	.detail-section {
 		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		padding: var(--space-md);
 	}
 
-	.detail-meta {
-		flex-shrink: 0;
+	.section-title {
 		display: flex;
-		justify-content: center;
-		padding: 0 var(--space-md) var(--space-sm);
+		align-items: baseline;
+		gap: var(--space-sm);
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-muted);
+		margin-bottom: var(--space-sm);
 	}
 
-	.toolbox-badge {
-		padding: 1px 6px;
+	.title-text {
+		flex-shrink: 0;
+	}
+
+	.title-meta {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		font-family: var(--font-mono);
 		font-size: 9px;
 		font-weight: 400;
-		color: var(--text-muted);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
+		color: var(--text-disabled);
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.detail-preview {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.detail-docs {
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
-		padding: var(--space-md);
+		padding: 0 var(--space-md) var(--space-md);
 		font-size: 11px;
 	}
 </style>
