@@ -3,13 +3,19 @@
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import NodePreview from '$lib/components/nodes/NodePreview.svelte';
 	import Icon from '$lib/components/icons/Icon.svelte';
-	import { tooltip } from '$lib/components/Tooltip.svelte';
 	interface Props {
 		onAddNode?: (type: string) => void;
 		focusSearch?: boolean;
+		/** Notifies the parent whenever the detail visibility flips, so it
+		 *  can grow the surrounding ResizablePanel by the detail-column
+		 *  width. */
+		ondetailvisible?: (visible: boolean) => void;
+		/** Reports the currently hovered item (or null when none), so the
+		 *  parent can render the detail column content on its own. */
+		onhoveritem?: (item: NodeTypeDefinition | null) => void;
 	}
 
-	let { onAddNode, focusSearch = false }: Props = $props();
+	let { onAddNode, focusSearch = false, ondetailvisible, onhoveritem }: Props = $props();
 
 	// Registry change counter — read it inside derived blocks so they re-run
 	// whenever a toolbox install/uninstall mutates the registry.
@@ -29,6 +35,16 @@
 	// Drag preview - rendered off-screen, used as drag image
 	let dragPreviewNode = $state<NodeTypeDefinition | null>(null);
 	let dragPreviewElement: HTMLDivElement;
+
+	// Hover-detail state. The detail content lives in a second column inside
+	// the library panel itself. We delay both opening and closing so that
+	// brushing past tiles on the way to the detail column doesn't flicker
+	// through every block in between.
+	const HOVER_OPEN_DELAY = 250;
+	const HOVER_CLOSE_DELAY = 120;
+	let hoveredItem = $state<NodeTypeDefinition | null>(null);
+	let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
+	let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Collapsed categories
 	let collapsedCategories = $state<Set<string>>(new Set());
@@ -90,13 +106,94 @@
 		return result;
 	});
 
-	// Handle mouse enter to prepare drag preview
+	// Handle mouse enter to prepare drag preview and schedule detail open.
 	function handleMouseEnter(node: NodeTypeDefinition) {
 		dragPreviewNode = node;
+		scheduleShowDetail(node);
+	}
+
+	function handleMouseLeave() {
+		scheduleHideDetail();
+	}
+
+	function scheduleShowDetail(node: NodeTypeDefinition) {
+		// Cancel pending close — we're hovering something again.
+		if (hoverCloseTimer !== null) {
+			clearTimeout(hoverCloseTimer);
+			hoverCloseTimer = null;
+		}
+		// If detail is already open, switch immediately so the user can hop
+		// between blocks without waiting for a re-open delay each time.
+		if (hoveredItem !== null) {
+			if (hoveredItem !== node) {
+				hoveredItem = node;
+				onhoveritem?.(node);
+			}
+			return;
+		}
+		// First-time open: wait a moment so brushing past tiles doesn't
+		// flash a detail.
+		if (hoverOpenTimer !== null) clearTimeout(hoverOpenTimer);
+		hoverOpenTimer = setTimeout(() => {
+			hoverOpenTimer = null;
+			hoveredItem = node;
+			onhoveritem?.(node);
+			ondetailvisible?.(true);
+		}, HOVER_OPEN_DELAY);
+	}
+
+	function scheduleHideDetail() {
+		// Pending open got cancelled — user left before we'd have shown it.
+		if (hoverOpenTimer !== null) {
+			clearTimeout(hoverOpenTimer);
+			hoverOpenTimer = null;
+		}
+		if (hoveredItem === null) return;
+		if (hoverCloseTimer !== null) clearTimeout(hoverCloseTimer);
+		hoverCloseTimer = setTimeout(() => {
+			hoverCloseTimer = null;
+			hoveredItem = null;
+			onhoveritem?.(null);
+			ondetailvisible?.(false);
+		}, HOVER_CLOSE_DELAY);
+	}
+
+	function hideDetailNow() {
+		if (hoverOpenTimer !== null) {
+			clearTimeout(hoverOpenTimer);
+			hoverOpenTimer = null;
+		}
+		if (hoverCloseTimer !== null) {
+			clearTimeout(hoverCloseTimer);
+			hoverCloseTimer = null;
+		}
+		const wasShown = hoveredItem !== null;
+		hoveredItem = null;
+		if (wasShown) {
+			onhoveritem?.(null);
+			ondetailvisible?.(false);
+		}
+	}
+
+	/** Called from the parent when the cursor enters the detail column —
+	 *  cancel any pending dismiss so the column stays open while the user
+	 *  reads the docs. */
+	export function keepDetailAlive() {
+		if (hoverCloseTimer !== null) {
+			clearTimeout(hoverCloseTimer);
+			hoverCloseTimer = null;
+		}
+	}
+
+	/** Called from the parent when the cursor leaves the detail column —
+	 *  schedule the same delayed dismiss as a tile mouseleave. */
+	export function dismissDetail() {
+		scheduleHideDetail();
 	}
 
 	// Handle drag start
 	function handleDragStart(event: DragEvent, nodeType: NodeTypeDefinition) {
+		hideDetailNow();
 		isDragging = true;
 		if (event.dataTransfer) {
 			event.dataTransfer.setData('application/pathview-node', nodeType.type);
@@ -126,6 +223,7 @@
 	// Handle click to add node (only if not dragging)
 	function handleNodeClick(node: NodeTypeDefinition) {
 		if (isDragging) return;
+		hideDetailNow();
 		if (onAddNode) {
 			onAddNode(node.type);
 		}
@@ -218,10 +316,10 @@
 								class:selected={isSelected(node)}
 								draggable="true"
 								onmouseenter={() => handleMouseEnter(node)}
+								onmouseleave={handleMouseLeave}
 								ondragstart={(e) => handleDragStart(e, node)}
 								ondragend={handleDragEnd}
 								onclick={() => handleNodeClick(node)}
-								use:tooltip={node.description}
 							>
 								<NodePreview {node} />
 							</button>
