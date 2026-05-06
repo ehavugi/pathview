@@ -35,7 +35,7 @@
 
 	// Drag preview - rendered off-screen, used as drag image
 	let dragPreviewNode = $state<NodeTypeDefinition | null>(null);
-	let dragPreviewElement: HTMLDivElement;
+	let dragPreviewElement = $state<HTMLDivElement | undefined>(undefined);
 
 	// Hover-detail state. The detail content lives in a second column inside
 	// the library panel itself. We delay both opening and closing so that
