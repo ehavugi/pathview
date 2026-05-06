@@ -18,7 +18,7 @@
 	import EventDetail from '$lib/components/panels/library-detail/EventDetail.svelte';
 	import SubsystemTree from '$lib/components/panels/SubsystemTree.svelte';
 	import ToolboxManagerDialog from '$lib/components/dialogs/ToolboxManagerDialog.svelte';
-	import { bootstrapToolboxes, type ToolboxConfig } from '$lib/toolbox';
+	import { bootstrapToolboxes, seedPreloadedToolboxes, type ToolboxConfig } from '$lib/toolbox';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import { buildContextMenuItems, type ContextMenuCallbacks } from '$lib/components/contextMenuBuilders';
 	import ExportDialog from '$lib/components/dialogs/ExportDialog.svelte';
@@ -525,19 +525,22 @@
 
 	onMount(() => {
 		// Bring up the Python backend the moment the page loads so the
-		// runtime is ready by the time the user clicks Run. Order matters:
-		// detect the active backend first, then initialise it, then run
-		// the toolbox bootstrap on top. The URL-param model load runs at
-		// the end so toolbox blocks are registered in nodeRegistry by the
-		// time BaseNode tries to resolve them — otherwise blocks from
-		// installed-but-not-yet-bootstrapped toolboxes render as (missing).
+		// runtime is ready by the time the user clicks Run. Pyodide must
+		// finish before any toolbox work, then we seed preloaded catalog
+		// entries synchronously so `findMissingRequirements` (used inside
+		// `loadFromUrlParam`) sees a correct toolbox store. After that,
+		// bootstrap and the URL-param load run in parallel: BaseNode reacts
+		// to `registryVersion` bumps, so blocks rendered as (missing) while
+		// toolboxes are still installing upgrade themselves automatically.
+		// `installAndRegisterToolbox` deduplicates by toolbox id, so the
+		// two paths are safe to overlap.
 		(async () => {
 			try {
 				await autoDetectBackend();
 				await initBackendFromUrl();
 				await initPyodide();
-				await bootstrapToolboxes();
-				await loadFromUrlParam();
+				seedPreloadedToolboxes();
+				await Promise.all([bootstrapToolboxes(), loadFromUrlParam()]);
 			} catch (e) {
 				console.error('[startup]', e);
 			}
