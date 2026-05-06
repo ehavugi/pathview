@@ -26,10 +26,15 @@
 		toolbar?: import('svelte').Snippet;
 		footer?: import('svelte').Snippet;
 		children?: import('svelte').Snippet;
-		/** Optional second column rendered next to the main content. When set,
-		 *  the panel body splits into two columns; without it, the panel
-		 *  layout is unchanged. */
+		/** Optional second column rendered next to the main content. When set
+		 *  AND `rightColumnActive` is true, the panel body splits into two
+		 *  columns; otherwise the panel layout is unchanged. */
 		rightColumn?: import('svelte').Snippet;
+		/** Controls whether the right column is currently rendered. Lets the
+		 *  parent define the snippet up front but defer the layout split until
+		 *  there's something to show (so the column doesn't eat panel width
+		 *  while empty). Defaults to true when a `rightColumn` is supplied. */
+		rightColumnActive?: boolean;
 	}
 
 	let {
@@ -51,8 +56,11 @@
 		toolbar,
 		footer,
 		children,
-		rightColumn
+		rightColumn,
+		rightColumnActive = true
 	}: Props = $props();
+
+	const showRightColumn = $derived(!!rightColumn && rightColumnActive);
 
 	// Calculate dynamic max height for bottom panels (viewport - nav bar - gaps)
 	function getEffectiveMaxHeight(): number {
@@ -233,13 +241,13 @@
 			{@render toolbar()}
 		</div>
 	{/if}
-	<div class="panel-body" class:split={!!rightColumn}>
+	<div class="panel-body" class:split={showRightColumn}>
 		<div class="panel-content">
 			{@render children?.()}
 		</div>
-		{#if rightColumn}
+		{#if showRightColumn}
 			<div class="panel-right">
-				{@render rightColumn()}
+				{@render rightColumn!()}
 			</div>
 		{/if}
 	</div>

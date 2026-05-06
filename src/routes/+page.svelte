@@ -1369,6 +1369,7 @@
 			maxWidth={500 + DETAIL_COLUMN_WIDTH}
 			bottomOffset={leftPanelBottomOffset()}
 			title="Blocks"
+			rightColumnActive={nodeLibraryDetailVisible}
 			onClose={() => showNodeLibrary = false}
 			onWidthChange={(w) =>
 				(nodeLibraryWidth = Math.min(
@@ -1418,6 +1419,7 @@
 			maxWidth={400 + DETAIL_COLUMN_WIDTH}
 			bottomOffset={leftPanelBottomOffset()}
 			title="Events"
+			rightColumnActive={eventsPanelDetailVisible}
 			onClose={() => showEventsPanel = false}
 			onWidthChange={(w) =>
 				(eventsPanelWidth = Math.min(
