@@ -57,6 +57,7 @@
 	.detail-section {
 		flex-shrink: 0;
 		padding: var(--space-md);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.section-title {
@@ -88,13 +89,14 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		padding: var(--space-lg) 0;
 	}
 
 	.detail-docs {
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
-		padding: 0 var(--space-md) var(--space-md);
+		padding: var(--space-md);
 		font-size: 11px;
 	}
 </style>
