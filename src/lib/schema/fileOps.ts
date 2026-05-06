@@ -211,7 +211,10 @@ async function installRequiredToolboxes(reqs: ToolboxRequirement[]): Promise<voi
 /**
  * Load a GraphFile into the application state
  */
-export async function loadGraphFile(file: GraphFile): Promise<void> {
+export async function loadGraphFile(
+	file: GraphFile,
+	options: { deferToolboxInstall?: boolean; backendReady?: Promise<unknown> } = {}
+): Promise<void> {
 	// Migrate old format if needed
 	file = migrateGraphFile(file);
 	// Validate version
@@ -222,12 +225,6 @@ export async function loadGraphFile(file: GraphFile): Promise<void> {
 	// Reset simulation state (stops running simulation, clears results and Python state)
 	resetSimulation(); // Fire and forget - synchronous part stops immediately
 
-	// Install any runtime toolboxes the file declared as required. Files
-	// saved before this field existed simply skip this step.
-	if (file.requiredToolboxes && file.requiredToolboxes.length > 0) {
-		await installRequiredToolboxes(file.requiredToolboxes);
-	}
-
 	// Clear previous state and wait for UI to update
 	// This ensures FlowCanvas sees empty state before new data arrives
 	graphStore.clear();
@@ -235,22 +232,16 @@ export async function loadGraphFile(file: GraphFile): Promise<void> {
 	consoleStore.clear();
 	await tick();
 
-	// Load graph (including annotations)
+	// Load graph (including annotations) — happens before toolbox install so
+	// the user sees the model immediately. Blocks whose toolbox isn't yet
+	// registered render as (missing) placeholders and upgrade themselves
+	// reactively via `registryVersion` once `installRequiredToolboxes`
+	// (below) completes.
 	graphStore.fromJSON(
 		file.graph?.nodes || [],
 		file.graph?.connections || [],
 		file.graph?.annotations || []
 	);
-
-	// Surface any block types that ended up unregistered after the install
-	// step (either because the user skipped install, or because the file
-	// has no requiredToolboxes block list — old files / hand-edited files).
-	const unknownTypes = validateNodeTypes(file.graph?.nodes || []);
-	if (unknownTypes.length > 0) {
-		consoleStore.warn(
-			`[toolbox] unknown block types in this file: ${unknownTypes.join(', ')}. They will render as placeholders.`
-		);
-	}
 
 	// Load events
 	if (file.events && file.events.length > 0) {
@@ -293,6 +284,37 @@ export async function loadGraphFile(file: GraphFile): Promise<void> {
 
 	// Trigger assembly animation for loaded graph
 	requestAssemblyAnimation();
+
+	// Install runtime toolboxes the file declared as required, then surface
+	// any block types that remain unregistered (user skipped install, or file
+	// has no requiredToolboxes — old / hand-edited files). In defer mode this
+	// runs in the background after `backendReady` resolves, so the graph
+	// shows up before Pyodide is even initialised.
+	const installAndWarn = async (): Promise<void> => {
+		if (file.requiredToolboxes && file.requiredToolboxes.length > 0) {
+			await installRequiredToolboxes(file.requiredToolboxes);
+		}
+		const unknownTypes = validateNodeTypes(file.graph?.nodes || []);
+		if (unknownTypes.length > 0) {
+			consoleStore.warn(
+				`[toolbox] unknown block types in this file: ${unknownTypes.join(', ')}. They will render as placeholders.`
+			);
+		}
+	};
+
+	if (options.deferToolboxInstall) {
+		void (async () => {
+			try {
+				if (options.backendReady) await options.backendReady;
+				await installAndWarn();
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : String(e);
+				consoleStore.error(`[toolbox] deferred install failed: ${msg}`);
+			}
+		})();
+	} else {
+		await installAndWarn();
+	}
 }
 
 /**
@@ -480,6 +502,14 @@ export interface ImportOptions {
 	position?: Position; // Where to place components (ignored for models)
 	fileHandle?: FileSystemFileHandle; // For native file picker (enables Save)
 	fileName?: string; // Display name (for URL imports or fallback)
+	// When true, the toolbox install step (which requires Pyodide) is fired
+	// off in the background — the graph fills immediately and (missing)
+	// blocks upgrade themselves via `registryVersion` once their toolbox
+	// registers. Used by the URL-param load on app start, where Pyodide may
+	// still be initialising. The deferred install awaits `backendReady`
+	// first, so it's safe to pass a not-yet-ready promise.
+	deferToolboxInstall?: boolean;
+	backendReady?: Promise<unknown>;
 }
 
 /**
@@ -635,7 +665,10 @@ async function importModel(
 		simulationSettings: content.simulationSettings || INITIAL_SIMULATION_SETTINGS
 	};
 
-	await loadGraphFile(graphFile);
+	await loadGraphFile(graphFile, {
+		deferToolboxInstall: options.deferToolboxInstall,
+		backendReady: options.backendReady
+	});
 
 	// Update current file tracking
 	currentFileHandle = options.fileHandle || null;
