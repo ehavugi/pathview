@@ -3,7 +3,7 @@
 	import { nodeRegistry, BUILTIN_SOURCE } from '$lib/nodes/registry';
 	import { toolboxes } from '$lib/toolbox/store';
 	import type { ToolboxConfig } from '$lib/toolbox/types';
-	import NodePreview from '$lib/components/nodes/NodePreview.svelte';
+	import CanvasBlockPreview from './CanvasBlockPreview.svelte';
 	import DocumentationSection from '$lib/components/dialogs/shared/DocumentationSection.svelte';
 
 	interface Props {
@@ -35,7 +35,7 @@
 			{/if}
 		</div>
 		<div class="detail-preview">
-			<NodePreview {node} />
+			<CanvasBlockPreview {node} />
 		</div>
 	</div>
 
