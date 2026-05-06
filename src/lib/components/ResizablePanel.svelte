@@ -26,6 +26,10 @@
 		toolbar?: import('svelte').Snippet;
 		footer?: import('svelte').Snippet;
 		children?: import('svelte').Snippet;
+		/** Optional second column rendered next to the main content. When set,
+		 *  the panel body splits into two columns; without it, the panel
+		 *  layout is unchanged. */
+		rightColumn?: import('svelte').Snippet;
 	}
 
 	let {
@@ -46,7 +50,8 @@
 		actions,
 		toolbar,
 		footer,
-		children
+		children,
+		rightColumn
 	}: Props = $props();
 
 	// Calculate dynamic max height for bottom panels (viewport - nav bar - gaps)
@@ -228,8 +233,15 @@
 			{@render toolbar()}
 		</div>
 	{/if}
-	<div class="panel-content">
-		{@render children?.()}
+	<div class="panel-body" class:split={!!rightColumn}>
+		<div class="panel-content">
+			{@render children?.()}
+		</div>
+		{#if rightColumn}
+			<div class="panel-right">
+				{@render rightColumn()}
+			</div>
+		{/if}
 	</div>
 	{#if footer}
 		<div class="panel-footer">
@@ -342,12 +354,41 @@
 		border-bottom: 1px solid var(--border);
 	}
 
+	/* When the panel has no second column, panel-body is layout-transparent,
+	 * so children sit in resizable-panel's column flex exactly like before. */
+	.panel-body {
+		display: contents;
+	}
+
+	.panel-body.split {
+		display: flex;
+		flex-direction: row;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+	}
+
 	.panel-content {
 		display: flex;
 		flex-direction: column;
 		flex: 1;
 		overflow: auto;
 		min-height: 0;
+	}
+
+	.panel-body.split .panel-content {
+		min-width: 0;
+	}
+
+	.panel-right {
+		flex-shrink: 0;
+		width: 320px;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		border-left: 1px solid var(--border);
+		background: var(--surface);
 	}
 
 	.panel-footer {
