@@ -34,21 +34,47 @@
 
 	// Hover-detail state — same pattern as NodeLibrary.
 	const HOVER_OPEN_DELAY = 250;
+	const HOVER_SWITCH_DELAY = 200;
 	const HOVER_CLOSE_DELAY = 120;
 	let hoveredItem = $state<EventTypeDefinition | null>(null);
 	let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
+	let hoverSwitchTimer: ReturnType<typeof setTimeout> | null = null;
 	let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearHoverTimers() {
+		if (hoverOpenTimer !== null) {
+			clearTimeout(hoverOpenTimer);
+			hoverOpenTimer = null;
+		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
+		}
+		if (hoverCloseTimer !== null) {
+			clearTimeout(hoverCloseTimer);
+			hoverCloseTimer = null;
+		}
+	}
 
 	function handleMouseEnter(item: EventTypeDefinition) {
 		if (hoverCloseTimer !== null) {
 			clearTimeout(hoverCloseTimer);
 			hoverCloseTimer = null;
 		}
+		if (hoveredItem === item) {
+			if (hoverSwitchTimer !== null) {
+				clearTimeout(hoverSwitchTimer);
+				hoverSwitchTimer = null;
+			}
+			return;
+		}
 		if (hoveredItem !== null) {
-			if (hoveredItem !== item) {
+			if (hoverSwitchTimer !== null) clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = setTimeout(() => {
+				hoverSwitchTimer = null;
 				hoveredItem = item;
 				onhoveritem?.(item);
-			}
+			}, HOVER_SWITCH_DELAY);
 			return;
 		}
 		if (hoverOpenTimer !== null) clearTimeout(hoverOpenTimer);
@@ -65,6 +91,10 @@
 			clearTimeout(hoverOpenTimer);
 			hoverOpenTimer = null;
 		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
+		}
 		if (hoveredItem === null) return;
 		if (hoverCloseTimer !== null) clearTimeout(hoverCloseTimer);
 		hoverCloseTimer = setTimeout(() => {
@@ -76,14 +106,7 @@
 	}
 
 	function hideDetailNow() {
-		if (hoverOpenTimer !== null) {
-			clearTimeout(hoverOpenTimer);
-			hoverOpenTimer = null;
-		}
-		if (hoverCloseTimer !== null) {
-			clearTimeout(hoverCloseTimer);
-			hoverCloseTimer = null;
-		}
+		clearHoverTimers();
 		const wasShown = hoveredItem !== null;
 		hoveredItem = null;
 		if (wasShown) {
@@ -96,6 +119,10 @@
 		if (hoverCloseTimer !== null) {
 			clearTimeout(hoverCloseTimer);
 			hoverCloseTimer = null;
+		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
 		}
 	}
 

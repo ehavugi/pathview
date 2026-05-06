@@ -41,10 +41,27 @@
 	// brushing past tiles on the way to the detail column doesn't flicker
 	// through every block in between.
 	const HOVER_OPEN_DELAY = 250;
+	const HOVER_SWITCH_DELAY = 200;
 	const HOVER_CLOSE_DELAY = 120;
 	let hoveredItem = $state<NodeTypeDefinition | null>(null);
 	let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
+	let hoverSwitchTimer: ReturnType<typeof setTimeout> | null = null;
 	let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function clearHoverTimers() {
+		if (hoverOpenTimer !== null) {
+			clearTimeout(hoverOpenTimer);
+			hoverOpenTimer = null;
+		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
+		}
+		if (hoverCloseTimer !== null) {
+			clearTimeout(hoverCloseTimer);
+			hoverCloseTimer = null;
+		}
+	}
 
 	// Collapsed categories
 	let collapsedCategories = $state<Set<string>>(new Set());
@@ -122,13 +139,25 @@
 			clearTimeout(hoverCloseTimer);
 			hoverCloseTimer = null;
 		}
-		// If detail is already open, switch immediately so the user can hop
-		// between blocks without waiting for a re-open delay each time.
+		// Already showing this exact item — drop any in-flight switch so
+		// it doesn't replace us with itself.
+		if (hoveredItem === node) {
+			if (hoverSwitchTimer !== null) {
+				clearTimeout(hoverSwitchTimer);
+				hoverSwitchTimer = null;
+			}
+			return;
+		}
+		// Detail is open on a different item: schedule a switch. Brushing
+		// past tiles on the way to the detail column won't flip content
+		// because the cursor leaves before this timer fires.
 		if (hoveredItem !== null) {
-			if (hoveredItem !== node) {
+			if (hoverSwitchTimer !== null) clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = setTimeout(() => {
+				hoverSwitchTimer = null;
 				hoveredItem = node;
 				onhoveritem?.(node);
-			}
+			}, HOVER_SWITCH_DELAY);
 			return;
 		}
 		// First-time open: wait a moment so brushing past tiles doesn't
@@ -143,10 +172,14 @@
 	}
 
 	function scheduleHideDetail() {
-		// Pending open got cancelled — user left before we'd have shown it.
+		// Cancel pending open / switch — user moved off before we'd commit.
 		if (hoverOpenTimer !== null) {
 			clearTimeout(hoverOpenTimer);
 			hoverOpenTimer = null;
+		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
 		}
 		if (hoveredItem === null) return;
 		if (hoverCloseTimer !== null) clearTimeout(hoverCloseTimer);
@@ -159,14 +192,7 @@
 	}
 
 	function hideDetailNow() {
-		if (hoverOpenTimer !== null) {
-			clearTimeout(hoverOpenTimer);
-			hoverOpenTimer = null;
-		}
-		if (hoverCloseTimer !== null) {
-			clearTimeout(hoverCloseTimer);
-			hoverCloseTimer = null;
-		}
+		clearHoverTimers();
 		const wasShown = hoveredItem !== null;
 		hoveredItem = null;
 		if (wasShown) {
@@ -176,12 +202,16 @@
 	}
 
 	/** Called from the parent when the cursor enters the detail column —
-	 *  cancel any pending dismiss so the column stays open while the user
-	 *  reads the docs. */
+	 *  cancel any pending dismiss / switch so the column stays open and
+	 *  doesn't swap content from a transient last-tile hover. */
 	export function keepDetailAlive() {
 		if (hoverCloseTimer !== null) {
 			clearTimeout(hoverCloseTimer);
 			hoverCloseTimer = null;
+		}
+		if (hoverSwitchTimer !== null) {
+			clearTimeout(hoverSwitchTimer);
+			hoverSwitchTimer = null;
 		}
 	}
 
