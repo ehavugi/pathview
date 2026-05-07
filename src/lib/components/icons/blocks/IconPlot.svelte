@@ -6,6 +6,7 @@
 
 	interface Props {
 		samples: Sample[];
+		samplesDashed?: Sample[];
 		xRange?: [number, number];
 		yRange?: [number, number];
 		axes?: AxesMode;
@@ -15,6 +16,7 @@
 
 	let {
 		samples,
+		samplesDashed,
 		xRange = [0, 1],
 		yRange = [0, 1],
 		axes = 'cross',
@@ -23,6 +25,11 @@
 	}: Props = $props();
 
 	const path = $derived(buildPath(samples, xRange[0], xRange[1], yRange[0], yRange[1]));
+	const pathDashed = $derived(
+		samplesDashed
+			? buildPath(samplesDashed, xRange[0], xRange[1], yRange[0], yRange[1])
+			: ''
+	);
 
 	const xAxisY = $derived(
 		yRange[0] <= 0 && yRange[1] >= 0 ? mapY(0, yRange[0], yRange[1]) : AXIS_BOX.y1
@@ -41,6 +48,9 @@
 	{/if}
 	{#if axes === 'cross'}
 		<line x1={yAxisX} y1={AXIS_BOX.y0} x2={yAxisX} y2={AXIS_BOX.y1} />
+	{/if}
+	{#if pathDashed}
+		<path d={pathDashed} stroke-dasharray="3 2.5" />
 	{/if}
 	<path d={path} />
 	{#if markers}

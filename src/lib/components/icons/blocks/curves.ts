@@ -287,6 +287,27 @@ export function delaySamples(t1 = 0.15, tau = 0.3): Sample[] {
 	];
 }
 
+/** Input sine for the Delay icon — runs over the full window, one full cycle. */
+export function delayInputSineSamples(cycles = 1, n = 64): Sample[] {
+	const out: Sample[] = [];
+	for (let i = 0; i < n; i++) {
+		const t = i / (n - 1);
+		out.push([t, Math.sin(2 * Math.PI * cycles * t)]);
+	}
+	return out;
+}
+
+/** Output sine for the Delay icon — flat at 0 until t1, then the same sine
+ *  shifted by t1 (so it tracks the input one delay later). */
+export function delayOutputSineSamples(t1 = 0.25, cycles = 1, n = 56): Sample[] {
+	const out: Sample[] = [[0, 0], [t1, 0]];
+	for (let i = 1; i < n; i++) {
+		const t = t1 + (1 - t1) * (i / (n - 1));
+		out.push([t, Math.sin(2 * Math.PI * cycles * (t - t1))]);
+	}
+	return out;
+}
+
 /** Differentiator step response: a sharp impulse at the step instant */
 export function impulseSamples(t0 = 0.45, width = 0.04): Sample[] {
 	return [

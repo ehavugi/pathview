@@ -40,6 +40,7 @@
 		{#if def.kind === 'plot'}
 			<IconPlot
 				samples={def.samples()}
+				samplesDashed={def.samplesDashed?.()}
 				xRange={def.xRange}
 				yRange={def.yRange}
 				axes={def.axes}

@@ -15,7 +15,7 @@ import * as C from './curves';
 type AxesMode = 'none' | 'baseline' | 'cross';
 
 export type IconDef =
-	| { kind: 'plot'; samples: () => Sample[]; xRange?: [number, number]; yRange?: [number, number]; axes?: AxesMode; markers?: boolean; decoration?: 'arrow-up' | 'arrow-down' }
+	| { kind: 'plot'; samples: () => Sample[]; samplesDashed?: () => Sample[]; xRange?: [number, number]; yRange?: [number, number]; axes?: AxesMode; markers?: boolean; decoration?: 'arrow-up' | 'arrow-down' }
 	| { kind: 'scope'; samples: () => Sample[]; samples2?: () => Sample[]; yRange?: [number, number]; gridX?: number; gridY?: number }
 	| { kind: 'surface'; fn?: (u: number, v: number) => number; rows?: number; cols?: number }
 	| { kind: 'math'; latex: string }
@@ -52,7 +52,12 @@ export const iconRegistry: Record<string, IconDef> = {
 	LeadLag: { kind: 'plot', samples: () => C.leadLagStepSamples(), yRange: LEADLAG_RANGE },
 	Integrator: { kind: 'plot', samples: () => C.rampSamples() },
 	Differentiator: { kind: 'plot', samples: () => C.differentiatorBode() },
-	Delay: { kind: 'plot', samples: () => C.delaySamples() },
+	Delay: {
+		kind: 'plot',
+		samples: () => C.delayOutputSineSamples(),
+		samplesDashed: () => C.delayInputSineSamples(),
+		yRange: Y_BIPOLAR
+	},
 	PID: { kind: 'plot', samples: () => C.pidStepSamples(), yRange: PT2_RANGE },
 	AntiWindupPID: { kind: 'plot', samples: () => C.pt1StepSamples(0.12, 0.12) },
 
