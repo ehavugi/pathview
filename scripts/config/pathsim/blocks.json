@@ -49,6 +49,7 @@
       "Divider",
       "Amplifier",
       "Function",
+      "Polynomial",
       "Sin",
       "Cos",
       "Tan",
@@ -78,9 +79,15 @@
       "LogicNot"
     ],
 
-    "Mixed": [
+    "Discrete": [
       "SampleHold",
+      "FirstOrderHold",
       "FIR",
+      "DiscreteIntegrator",
+      "DiscreteDerivative",
+      "DiscreteStateSpace",
+      "DiscreteTransferFunction",
+      "TappedDelay",
       "ADC",
       "DAC",
       "Counter",

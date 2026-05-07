@@ -108,6 +108,15 @@ export const iconRegistry: Record<string, IconDef> = {
 	DynamicalSystem: { kind: 'math', latex: '\\begin{aligned}\\dot{x} &= f(x, u, t)\\\\ y &= g(x, u, t)\\end{aligned}' },
 	DynamicalFunction: { kind: 'math', latex: 'f(u, t)' },
 	Function: { kind: 'math', latex: 'f(u)' },
+	Polynomial: { kind: 'math', latex: 'y = \\sum_{k=0}^{n} c_k\\,u^{n-k}' },
+
+	/* --- Discrete-time blocks --- */
+	FirstOrderHold: { kind: 'plot', samples: () => C.firstOrderHoldSamples() },
+	DiscreteIntegrator: { kind: 'math', latex: '\\dfrac{T}{z-1}' },
+	DiscreteDerivative: { kind: 'math', latex: '\\dfrac{z-1}{T\\,z}' },
+	DiscreteStateSpace: { kind: 'math', latex: '\\begin{aligned}x[k{+}1] &= Ax[k]{+}Bu[k]\\\\ y[k] &= Cx[k]{+}Du[k]\\end{aligned}' },
+	DiscreteTransferFunction: { kind: 'math', latex: 'H(z) = \\dfrac{B(z)}{A(z)}' },
+	TappedDelay: { kind: 'svg', name: 'TappedDelay' },
 
 	/* --- Geometric SVGs (kept as files) --- */
 	Adder: { kind: 'svg', name: 'Adder' },
