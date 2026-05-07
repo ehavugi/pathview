@@ -105,6 +105,8 @@ src/
 │   │   └── generated/     # Auto-generated defaults
 │   ├── stores/            # Svelte stores (state management)
 │   │   └── graph/         # Graph state with subsystem navigation
+│   ├── toolbox/           # Runtime toolbox install/registry (catalog, installer, dependencies)
+│   ├── tours/             # In-app onboarding tours (builder, anchors, scripts)
 │   ├── types/             # TypeScript type definitions
 │   └── utils/             # Utilities (colors, download, csvExport, codemirror)
 ├── routes/                # SvelteKit pages
@@ -114,6 +116,7 @@ pathview/                  # Python package (pip install pathview)
 ├── app.py                 # Flask server (subprocess management, HTTP routes)
 ├── worker.py              # REPL worker subprocess (Python execution)
 ├── cli.py                 # CLI entry point (pathview serve)
+├── config.py              # Server configuration (host, port, packages)
 ├── converter.py           # PVM to Python converter (public API)
 ├── data/                  # Bundled data files
 │   └── registry.json      # Block/event registry for converter
@@ -131,7 +134,10 @@ scripts/
 ├── generated/             # Generated files (from extract.py)
 │   └── registry.json      # Block/event registry with import paths
 ├── extract.py             # Unified extraction script
-└── pvm2py.py              # Standalone .pvm to Python converter
+├── pathview_introspect.py # Shared block/event introspection helpers
+├── pvm2py.py              # Standalone .pvm to Python converter
+├── build_package.py       # Build pip wheel + bundled frontend
+└── capture-screenshots.js # Snapshot block icons for build (Playwright)
 ```
 
 ---
@@ -276,16 +282,18 @@ Configure in `src/lib/nodes/uiConfig.ts`:
 
 ```typescript
 export const syncPortBlocks = new Set([
-  'Integrator',
-  'Differentiator',
-  'Delay',
-  'PID',
-  'PID_Antiwindup',
-  'Amplifier',
-  'Sin', 'Cos', 'Tan', 'Tanh',
+  // Dynamic blocks
+  'Integrator', 'Differentiator', 'Delay',
+  // Algebraic blocks (element-wise)
+  'Amplifier', 'Sin', 'Cos', 'Tan', 'Tanh',
   'Abs', 'Sqrt', 'Exp', 'Log', 'Log10',
-  'Mod', 'Clip', 'Pow',
-  'SampleHold'
+  'Mod', 'Clip', 'Pow', 'Polynomial',
+  'Rescale', 'Alias',
+  // Logic blocks
+  'LogicNot',
+  // Discrete blocks
+  'SampleHold', 'FirstOrderHold',
+  'DiscreteIntegrator', 'DiscreteDerivative'
 ]);
 ```
 
@@ -309,56 +317,48 @@ export const portLabelParams: Record<string, PortLabelConfig | PortLabelConfig[]
 
 ---
 
-## Adding New Toolboxes
+## Toolboxes
 
-To add a new PathSim toolbox (like `pathsim-chem`):
+PathView supports two complementary ways to extend the block library: **runtime toolboxes** that the user installs from the UI at any time, and **build-time toolboxes** that are baked into the deployed bundle.
 
-### 1. Add to requirements
+### Runtime Toolboxes (default)
 
-Edit `scripts/config/requirements-pyodide.txt`:
+Users install toolboxes from the **Toolbox Manager** dialog without rebuilding the app. Three install sources are supported:
 
-```txt
---pre
-pathsim
-pathsim-chem>=0.2rc2  # optional
-pathsim-controls      # optional - your new toolbox
-```
+- **PyPI** — install a published package via `micropip` (Pyodide) or `pip` (Flask backend)
+- **URL** — load a wheel or sdist hosted anywhere
+- **Inline** — paste / upload a `.py` module to register ad-hoc blocks for one session
 
-The `# optional` comment means Pyodide will continue loading if this package fails to install.
+Once installed, PathView introspects the module's `Block` (and optional `Event`) subclasses, registers them as new node types, and persists the selection to `localStorage` so it replays on reload. The user can disable individual blocks, override their category, name, shape, or `syncPorts` flag, and uninstall the toolbox at any time. Saving a `.pvm` file embeds the list of toolbox dependencies; opening one elsewhere prompts to install missing pieces.
 
-### 2. Create toolbox config
+Implementation lives in `src/lib/toolbox/` (catalog, installer, register, persistence). The curated catalog of one-click installable toolboxes is in `catalog.ts`:
 
-Create `scripts/config/pathsim-controls/blocks.json`:
-
-```json
-{
-  "$schema": "../schemas/blocks.schema.json",
-  "toolbox": "pathsim-controls",
-  "importPath": "pathsim_controls.blocks",
-
-  "categories": {
-    "Controls": [
-      "PIDController",
-      "StateEstimator"
-    ]
+```typescript
+export const TOOLBOX_CATALOG: CatalogEntry[] = [
+  {
+    id: 'pathsim-chem',
+    displayName: 'pathsim-chem',
+    source: { type: 'pypi', pkg: 'pathsim-chem' },
+    importPath: 'pathsim_chem',
+    defaultCategory: 'Chemical',
+    preloaded: true   // seeded into store on first launch
   }
-}
+];
 ```
 
-### 3. (Optional) Add events
+To add an entry to the catalog: append a `CatalogEntry` to `TOOLBOX_CATALOG` and ship — no extraction step, no rebuild required for the user. Toolboxes outside the catalog still work via the manager's PyPI/URL/file inputs.
 
-Create `scripts/config/pathsim-controls/events.json` if the toolbox has custom events.
+For the toolbox-package contract (which Python conventions a toolbox must follow to be introspectable), see [**docs/toolbox-spec.md**](docs/toolbox-spec.md).
 
-### 4. Run extraction and build
+### Build-time Toolboxes (bundled into the deploy)
 
-```bash
-npm run extract
-npm run build
-```
+For toolboxes that should be available without an install step (e.g. the core `pathsim` toolbox itself), block metadata is extracted at build time:
 
-No code changes needed - the extraction script automatically discovers toolbox directories.
+1. Add the package to `scripts/config/requirements-pyodide.txt` so Pyodide can install it.
+2. Create `scripts/config/<toolbox-id>/blocks.json` (and optionally `events.json`) listing the categories and block class names.
+3. Run `npm run extract` to regenerate the TypeScript registry under `src/lib/*/generated/`.
 
-For the full toolbox integration reference (Python package contract, config schemas, extraction pipeline, generated output), see [**docs/toolbox-spec.md**](docs/toolbox-spec.md).
+The build-time path is appropriate when a toolbox is part of the core deployment; for everything else prefer the runtime path, which avoids a redeploy.
 
 ---
 
@@ -710,6 +710,8 @@ https://view.pathsim.org/?modelgh=pathsim/pathview/static/examples/feedback-syst
 | `npm run build:package` | Build pip package (frontend + wheel) |
 | `npm run preview` | Preview production build |
 | `npm run check` | TypeScript/Svelte type checking |
+| `npm run check:watch` | Type checking in watch mode |
+| `npm run screenshots` | Capture block-icon screenshots (Playwright) |
 | `npm run lint` | Run ESLint |
 | `npm run format` | Format code with Prettier |
 | `npm run extract` | Regenerate all definitions from PathSim |
@@ -733,7 +735,8 @@ Nodes are styled based on their category, with CSS-driven shapes and colors.
 | Sources | Pill | 20px |
 | Dynamic | Rectangle | 4px |
 | Algebraic | Rectangle | 4px |
-| Mixed | Asymmetric | 12px 4px 12px 4px |
+| Logic | Rectangle | 4px |
+| Discrete | Asymmetric | 12px 4px 12px 4px |
 | Recording | Pill | 20px |
 | Subsystem | Rectangle | 4px |
 
