@@ -950,6 +950,20 @@ export const extractedBlocks: Record<string, ExtractedBlock> =
     "inputs": null,
     "outputs": null
   },
+  "Polynomial": {
+    "blockClass": "Polynomial",
+    "description": "Polynomial operator block.",
+    "docstringHtml": "<p>Polynomial operator block.</p>\n<p>Evaluates a polynomial in the input. The coefficients follow the\n<cite>numpy.polyval</cite> convention, with the highest order term first:</p>\n<div class=\"math\">\n\\begin{equation*}\n\\vec{y} = c_0 \\vec{u}^n + c_1 \\vec{u}^{n-1} + \\dots + c_{n-1} \\vec{u} + c_n\n\\end{equation*}\n</div>\n<p>This block supports vector inputs (the polynomial is evaluated\nelement-wise).</p>\n<div class=\"section\" id=\"example\">\n<h3>Example</h3>\n<p>Quadratic <span class=\"math\">\\(y = 2 u^2 + 3 u + 1\\)</span>:</p>\n<pre class=\"code python literal-block\">\n<span class=\"name\">p</span> <span class=\"operator\">=</span> <span class=\"name\">Polynomial</span><span class=\"punctuation\">(</span><span class=\"name\">coeffs</span><span class=\"operator\">=</span><span class=\"punctuation\">[</span><span class=\"literal number integer\">2</span><span class=\"punctuation\">,</span> <span class=\"literal number integer\">3</span><span class=\"punctuation\">,</span> <span class=\"literal number integer\">1</span><span class=\"punctuation\">])</span>\n</pre>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>coeffs <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>polynomial coefficients in descending order of power,\nfollowing the <tt class=\"docutils literal\">numpy.polyval</tt> convention</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>op_alg <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">Operator</span></dt>\n<dd>internal algebraic operator</dd>\n</dl>\n</div>\n",
+    "params": {
+      "coeffs": {
+        "type": "array",
+        "default": "[1.0, 0.0]",
+        "description": "polynomial coefficients in descending order of power, following the ``numpy.polyval`` convention"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
   "Sin": {
     "blockClass": "Sin",
     "description": "Sine operator block.",
@@ -1264,18 +1278,37 @@ export const extractedBlocks: Record<string, ExtractedBlock> =
   },
   "SampleHold": {
     "blockClass": "SampleHold",
-    "description": "Samples the inputs periodically and produces them at the output.",
-    "docstringHtml": "<p>Samples the inputs periodically and produces them at the output.</p>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic sampling</dd>\n</dl>\n</div>\n",
+    "description": "Zero-order hold: samples the input periodically and holds it at the output.",
+    "docstringHtml": "<p>Zero-order hold: samples the input periodically and holds it at the output.</p>\n<div class=\"math\">\n\\begin{equation*}\ny(t) = u(k T + \\tau), \\quad k T + \\tau \\leq t &lt; (k+1) T + \\tau\n\\end{equation*}\n</div>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>Supports vector input — each channel is sampled independently.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic sampling</dd>\n</dl>\n</div>\n",
     "params": {
       "T": {
-        "type": "integer",
-        "default": "1",
+        "type": "number",
+        "default": "1.0",
         "description": "sampling period"
       },
       "tau": {
-        "type": "integer",
-        "default": "0",
-        "description": "delay Attributes ----------"
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
+  "FirstOrderHold": {
+    "blockClass": "FirstOrderHold",
+    "description": "First-order hold reconstructor.",
+    "docstringHtml": "<p>First-order hold reconstructor.</p>\n<p>Reconstructs a continuous signal from periodic samples using linear\nextrapolation across one sampling interval. Causal (one-sample-lag)\nvariant matching the Simulink <tt class=\"docutils literal\"><span class=\"pre\">First-Order</span> Hold</tt> block.</p>\n<p>Between two consecutive sample times <span class=\"math\">\\(t_{k-1}\\)</span> and <span class=\"math\">\\(t_k\\)</span>,\nthe output is</p>\n<div class=\"math\">\n\\begin{equation*}\ny(t) = u_{k-1} + \\frac{u_{k-1} - u_{k-2}}{T} (t - t_{k-1})\n\\end{equation*}\n</div>\n<p>During the very first interval (only one sample captured) the output\nis held at the most recent sample.</p>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>Supports vector input — each channel is extrapolated independently.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic sampling</dd>\n</dl>\n</div>\n",
+    "params": {
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
       }
     },
     "inputs": null,
@@ -1283,23 +1316,139 @@ export const extractedBlocks: Record<string, ExtractedBlock> =
   },
   "FIR": {
     "blockClass": "FIR",
-    "description": "Models a discrete-time Finite-Impulse-Response (FIR) filter.",
-    "docstringHtml": "<p>Models a discrete-time Finite-Impulse-Response (FIR) filter.</p>\n<p>This block applies an FIR filter to an input signal sampled periodically.\nThe output at each sample time is a weighted sum of the current and a finite number\nof past input samples. The operation is triggered by a scheduled event.</p>\n<p>Functionality:</p>\n<div class=\"math\">\n\\begin{equation*}\ny[n] = b[0] x[n] + b[1] x[n-1] + \\dots + b[N] x[n-N]\n\\end{equation*}\n</div>\n<p>where <cite>b</cite> are the filter coefficients and <cite>N</cite> is the filter order (number of\ncoefficients - 1).</p>\n<ol class=\"arabic simple\">\n<li>Samples the input <cite>inputs[0]</cite> at intervals of <cite>T</cite>, starting after delay <cite>tau</cite>.</li>\n<li>Stores the current and past <cite>len(coefficients) - 1</cite> input samples in an internal buffer.</li>\n<li>Computes the filter output using the dot product of the coefficients\nand the buffered input samples.</li>\n<li>Outputs the result on <cite>outputs[0]</cite>.</li>\n<li>Holds the output constant between updates.</li>\n</ol>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>coeffs <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>List or numpy array of FIR filter coefficients [b0, b1, ..., bN].\nThe number of coefficients determines the filter's order and memory.</dd>\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float, optional</span></dt>\n<dd>Sampling period (time between input samples and output updates). Default is 1.</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float, optional</span></dt>\n<dd>Initial delay before the first sample is processed. Default is 0.</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"input-ports\">\n<h3>Input Ports</h3>\n<dl class=\"docutils\">\n<dt>inputs[0] <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>Input signal sample at the current time step.</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"output-ports\">\n<h3>Output Ports</h3>\n<dl class=\"docutils\">\n<dt>outputs[0] <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>Filtered output signal sample.</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>buffer <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">deque</span></dt>\n<dd>Internal buffer storing the most recent input samples.</dd>\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>Internal scheduled event triggering the filter calculation.</dd>\n</dl>\n</div>\n",
+    "description": "Discrete-time Finite-Impulse-Response (FIR) filter.",
+    "docstringHtml": "<p>Discrete-time Finite-Impulse-Response (FIR) filter.</p>\n<p>Applies an FIR filter to a periodically sampled input signal.</p>\n<div class=\"math\">\n\\begin{equation*}\ny[n] = b_0 x[n] + b_1 x[n-1] + \\dots + b_N x[n-N]\n\\end{equation*}\n</div>\n<p>where <tt class=\"docutils literal\">b</tt> are the filter coefficients and <tt class=\"docutils literal\">N</tt> is the filter order\n(number of coefficients minus one). The output is held constant\nbetween sample times.</p>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>Supports vector input — the same coefficients are applied to each\nchannel in parallel.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>coeffs <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>FIR filter coefficients <tt class=\"docutils literal\">[b0, b1, <span class=\"pre\">...,</span> bN]</tt></dd>\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic filter evaluation</dd>\n</dl>\n</div>\n",
     "params": {
       "coeffs": {
         "type": "array",
         "default": "[1.0]",
-        "description": "List or numpy array of FIR filter coefficients [b0, b1, ..., bN]. The number of coefficients determines the filter's order and memory."
+        "description": "FIR filter coefficients ``[b0, b1, ..., bN]``"
       },
       "T": {
-        "type": "integer",
-        "default": "1",
-        "description": "Sampling period (time between input samples and output updates). Default is 1."
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
       },
       "tau": {
-        "type": "integer",
-        "default": "0",
-        "description": "Initial delay before the first sample is processed. Default is 0."
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
+  "DiscreteIntegrator": {
+    "blockClass": "DiscreteIntegrator",
+    "description": "Discrete-time integrator (forward Euler).",
+    "docstringHtml": "<p>Discrete-time integrator (forward Euler).</p>\n<div class=\"math\">\n\\begin{equation*}\ny[k+1] = y[k] + T \\, u[k]\n\\end{equation*}\n</div>\n<p>The output at sample <tt class=\"docutils literal\">k</tt> is the accumulated sum of past inputs;\nthe current input <tt class=\"docutils literal\">u[k]</tt> only enters the next sample.</p>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>Supports vector input — each channel is integrated independently.\nPass an array as <tt class=\"docutils literal\">initial_value</tt> to set per-channel initial values.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n<dt>initial_value <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float, array_like</span></dt>\n<dd>initial integrator output <tt class=\"docutils literal\">y[0]</tt></dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic update</dd>\n</dl>\n</div>\n",
+    "params": {
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      },
+      "initial_value": {
+        "type": "number",
+        "default": "0.0",
+        "description": "initial integrator output ``y[0]``"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
+  "DiscreteDerivative": {
+    "blockClass": "DiscreteDerivative",
+    "description": "Discrete-time backward-difference derivative.",
+    "docstringHtml": "<p>Discrete-time backward-difference derivative.</p>\n<div class=\"math\">\n\\begin{equation*}\ny[k] = \\frac{u[k] - u[k-1]}{T}\n\\end{equation*}\n</div>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>Supports vector input — each channel is differentiated independently.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic update</dd>\n</dl>\n</div>\n",
+    "params": {
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
+  "DiscreteStateSpace": {
+    "blockClass": "DiscreteStateSpace",
+    "description": "Discrete-time MIMO state space block.",
+    "docstringHtml": "<p>Discrete-time MIMO state space block.</p>\n<div class=\"math\">\n\\begin{equation*}\n\\begin{align}\n    x[k+1] &amp;= \\mathbf{A}\\, x[k] + \\mathbf{B}\\, u[k] \\\\\n    y[k]   &amp;= \\mathbf{C}\\, x[k] + \\mathbf{D}\\, u[k]\n\\end{align}\n\\end{equation*}\n</div>\n<div class=\"section\" id=\"note\">\n<h3>Note</h3>\n<p>The output port reflects <tt class=\"docutils literal\">y[k]</tt> for the duration of the current\nsample interval (zero-order hold between updates). The direct\nfeedthrough term <tt class=\"docutils literal\">D u[k]</tt> is computed at the sample event, so the\nblock has no algebraic passthrough between updates.</p>\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>A, B, C, D <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>discrete state space matrices</dd>\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n<dt>initial_value <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like, None</span></dt>\n<dd>initial state <tt class=\"docutils literal\">x[0]</tt></dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic update</dd>\n</dl>\n</div>\n",
+    "params": {
+      "A": {
+        "type": "number",
+        "default": "0.0",
+        "description": ""
+      },
+      "B": {
+        "type": "number",
+        "default": "1.0",
+        "description": ""
+      },
+      "C": {
+        "type": "number",
+        "default": "1.0",
+        "description": ""
+      },
+      "D": {
+        "type": "number",
+        "default": "0.0",
+        "description": "discrete state space matrices"
+      },
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      },
+      "initial_value": {
+        "type": "any",
+        "default": null,
+        "description": "initial state ``x[0]``"
+      }
+    },
+    "inputs": null,
+    "outputs": null
+  },
+  "DiscreteTransferFunction": {
+    "blockClass": "DiscreteTransferFunction",
+    "description": "Discrete-time SISO transfer function in numerator/denominator form.",
+    "docstringHtml": "<p>Discrete-time SISO transfer function in numerator/denominator form.</p>\n<div class=\"math\">\n\\begin{equation*}\nH(z) = \\frac{b_0 z^M + b_1 z^{M-1} + \\dots + b_M}{a_0 z^N + a_1 z^{N-1} + \\dots + a_N}\n\\end{equation*}\n</div>\n<p>Realized internally as a <tt class=\"docutils literal\">DiscreteStateSpace</tt> via the controllable\ncanonical form returned by <tt class=\"docutils literal\">scipy.signal.tf2ss</tt>.</p>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>Num <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>numerator polynomial coefficients (highest power of z first)</dd>\n<dt>Den <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">array_like</span></dt>\n<dd>denominator polynomial coefficients (highest power of z first)</dd>\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n",
+    "params": {
+      "Num": {
+        "type": "array",
+        "default": "[1.0]",
+        "description": "numerator polynomial coefficients (highest power of z first)"
+      },
+      "Den": {
+        "type": "array",
+        "default": "[1.0, 0.0]",
+        "description": "denominator polynomial coefficients (highest power of z first)"
+      },
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
       }
     },
     "inputs": [
@@ -1308,6 +1457,32 @@ export const extractedBlocks: Record<string, ExtractedBlock> =
     "outputs": [
       "out"
     ]
+  },
+  "TappedDelay": {
+    "blockClass": "TappedDelay",
+    "description": "Tapped delay line.",
+    "docstringHtml": "<p>Tapped delay line.</p>\n<p>Outputs the current and <tt class=\"docutils literal\"><span class=\"pre\">N-1</span></tt> past samples of the input as parallel\nsignals. The block has <tt class=\"docutils literal\">N</tt> outputs:</p>\n<div class=\"math\">\n\\begin{equation*}\ny_i[k] = u[k - i], \\quad i = 0, 1, \\dots, N-1\n\\end{equation*}\n</div>\n<div class=\"section\" id=\"parameters\">\n<h3>Parameters</h3>\n<dl class=\"docutils\">\n<dt>N <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">int</span></dt>\n<dd>number of taps (output ports)</dd>\n<dt>T <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>sampling period</dd>\n<dt>tau <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">float</span></dt>\n<dd>delay before first sample</dd>\n</dl>\n</div>\n<div class=\"section\" id=\"attributes\">\n<h3>Attributes</h3>\n<dl class=\"docutils\">\n<dt>events <span class=\"classifier-delimiter\">:</span> <span class=\"classifier\">list[Schedule]</span></dt>\n<dd>internal scheduled event for periodic shift</dd>\n</dl>\n</div>\n",
+    "params": {
+      "N": {
+        "type": "integer",
+        "default": "2",
+        "description": "number of taps (output ports)"
+      },
+      "T": {
+        "type": "number",
+        "default": "1.0",
+        "description": "sampling period"
+      },
+      "tau": {
+        "type": "number",
+        "default": "0.0",
+        "description": "delay before first sample"
+      }
+    },
+    "inputs": [
+      "in"
+    ],
+    "outputs": null
   },
   "ADC": {
     "blockClass": "ADC",
@@ -1571,9 +1746,9 @@ export const extractedBlocks: Record<string, ExtractedBlock> =
 export const blockConfig: Record<string, string[]> = {
   Sources: ["Constant", "Source", "SinusoidalSource", "StepSource", "PulseSource", "TriangleWaveSource", "SquareWaveSource", "GaussianPulseSource", "ChirpPhaseNoiseSource", "ClockSource", "WhiteNoise", "PinkNoise", "RandomNumberGenerator"],
   Dynamic: ["Integrator", "Differentiator", "Delay", "ODE", "DynamicalSystem", "StateSpace", "PT1", "PT2", "LeadLag", "PID", "AntiWindupPID", "RateLimiter", "Backlash", "Deadband", "TransferFunctionNumDen", "TransferFunctionZPG", "ButterworthLowpassFilter", "ButterworthHighpassFilter", "ButterworthBandpassFilter", "ButterworthBandstopFilter"],
-  Algebraic: ["Adder", "Multiplier", "Divider", "Amplifier", "Function", "Sin", "Cos", "Tan", "Tanh", "Abs", "Sqrt", "Exp", "Log", "Log10", "Mod", "Clip", "Pow", "Atan2", "Rescale", "Alias", "Switch", "LUT", "LUT1D"],
+  Algebraic: ["Adder", "Multiplier", "Divider", "Amplifier", "Function", "Polynomial", "Sin", "Cos", "Tan", "Tanh", "Abs", "Sqrt", "Exp", "Log", "Log10", "Mod", "Clip", "Pow", "Atan2", "Rescale", "Alias", "Switch", "LUT", "LUT1D"],
   Logic: ["GreaterThan", "LessThan", "Equal", "LogicAnd", "LogicOr", "LogicNot"],
-  Mixed: ["SampleHold", "FIR", "ADC", "DAC", "Counter", "CounterUp", "CounterDown", "Relay", "Wrapper"],
+  Discrete: ["SampleHold", "FirstOrderHold", "FIR", "DiscreteIntegrator", "DiscreteDerivative", "DiscreteStateSpace", "DiscreteTransferFunction", "TappedDelay", "ADC", "DAC", "Counter", "CounterUp", "CounterDown", "Relay", "Wrapper"],
   Recording: ["Scope", "Spectrum"],
 };
 
@@ -1602,11 +1777,16 @@ export const blockImportPaths: Record<string, string> = {
   "Deadband": "pathsim.blocks",
   "Delay": "pathsim.blocks",
   "Differentiator": "pathsim.blocks",
+  "DiscreteDerivative": "pathsim.blocks",
+  "DiscreteIntegrator": "pathsim.blocks",
+  "DiscreteStateSpace": "pathsim.blocks",
+  "DiscreteTransferFunction": "pathsim.blocks",
   "Divider": "pathsim.blocks",
   "DynamicalSystem": "pathsim.blocks",
   "Equal": "pathsim.blocks",
   "Exp": "pathsim.blocks",
   "FIR": "pathsim.blocks",
+  "FirstOrderHold": "pathsim.blocks",
   "Function": "pathsim.blocks",
   "GaussianPulseSource": "pathsim.blocks",
   "GreaterThan": "pathsim.blocks",
@@ -1627,6 +1807,7 @@ export const blockImportPaths: Record<string, string> = {
   "PT1": "pathsim.blocks",
   "PT2": "pathsim.blocks",
   "PinkNoise": "pathsim.blocks",
+  "Polynomial": "pathsim.blocks",
   "Pow": "pathsim.blocks",
   "PulseSource": "pathsim.blocks",
   "RandomNumberGenerator": "pathsim.blocks",
@@ -1646,6 +1827,7 @@ export const blockImportPaths: Record<string, string> = {
   "Switch": "pathsim.blocks",
   "Tan": "pathsim.blocks",
   "Tanh": "pathsim.blocks",
+  "TappedDelay": "pathsim.blocks",
   "TransferFunctionNumDen": "pathsim.blocks",
   "TransferFunctionZPG": "pathsim.blocks",
   "TriangleWaveSource": "pathsim.blocks",

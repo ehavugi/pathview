@@ -29,7 +29,7 @@ export const BLOCK_CATEGORY_ORDER: string[] = [
 	'Dynamic',
 	'Algebraic',
 	'Logic',
-	'Mixed',
+	'Discrete',
 	'Recording',
 	'Subsystem'
 ];

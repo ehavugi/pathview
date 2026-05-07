@@ -647,6 +647,17 @@ export function sampleHoldSamples(n = 6): Sample[] {
 	return out;
 }
 
+/** First-order hold — piecewise-linear interpolation through sample points.
+ *  Same sample values as SampleHold so the two icons read as a pair. */
+export function firstOrderHoldSamples(n = 6): Sample[] {
+	const samplesY = [0.1, 0.3, 0.55, 0.75, 0.55, 0.85];
+	const out: Sample[] = [];
+	for (let i = 0; i < n; i++) {
+		out.push([i / (n - 1), samplesY[i]]);
+	}
+	return out;
+}
+
 export function backlashSamples(): Sample[] {
 	return [
 		[-1, -0.7],

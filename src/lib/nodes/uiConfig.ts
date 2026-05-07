@@ -78,12 +78,16 @@ export const syncPortBlocks = new Set([
 	'Mod',
 	'Clip',
 	'Pow',
+	'Polynomial',
 	'Rescale',
 	'Alias',
 
 	// Logic blocks (element-wise)
 	'LogicNot',
 
-	// Mixed blocks (parallel sampling)
-	'SampleHold'
+	// Discrete blocks (parallel sampling / discrete dynamics)
+	'SampleHold',
+	'FirstOrderHold',
+	'DiscreteIntegrator',
+	'DiscreteDerivative'
 ]);
