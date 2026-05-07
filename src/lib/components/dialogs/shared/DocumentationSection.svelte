@@ -227,27 +227,23 @@
 		letter-spacing: 0.5px;
 	}
 
-	/* Inline code */
+	/* Inline code — monospace, body size, accent colour, no pill chrome */
 	.docs-content :global(tt),
 	.docs-content :global(code),
 	.docs-content :global(.literal) {
 		font-family: var(--font-mono);
-		font-size: 10px;
-		background: var(--surface-raised);
-		padding: 1px 4px;
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--border);
-		color: var(--text-muted);
-	}
-
-	/* Don't style code inside CodeMirror or tables */
-	.docs-content :global(.cm-content code),
-	.docs-content :global(.param-name code),
-	.docs-content :global(.param-type code) {
+		font-size: inherit;
+		color: var(--accent);
 		background: none;
 		padding: 0;
 		border: none;
 		border-radius: 0;
+	}
+
+	/* Param-table cells already have their own monospace styling — keep accent off */
+	.docs-content :global(.param-name code),
+	.docs-content :global(.param-type code) {
+		color: inherit;
 	}
 
 	/* Code block wrapper with header */
