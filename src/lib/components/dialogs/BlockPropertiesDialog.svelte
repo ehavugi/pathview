@@ -76,6 +76,7 @@
 		unsubscribeDialog();
 		unsubscribeNodes();
 		unsubscribeTheme();
+		recordingData.destroy();
 		destroyEditor();
 	});
 
