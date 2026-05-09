@@ -332,7 +332,7 @@ export function duplicateSelected(): string[] {
 				nodeId: newId
 			})),
 			// Deep clone params to avoid shared references
-			params: JSON.parse(JSON.stringify(original.params)),
+			params: structuredClone(original.params),
 			// Copy pinnedParams array if present
 			pinnedParams: original.pinnedParams ? [...original.pinnedParams] : undefined,
 			color: original.color
@@ -340,7 +340,7 @@ export function duplicateSelected(): string[] {
 
 		// Deep copy and regenerate IDs for subsystem graphs (handles nested subsystems)
 		if (original.graph) {
-			const clonedGraph = JSON.parse(JSON.stringify(original.graph));
+			const clonedGraph = structuredClone(original.graph);
 			newNode.graph = regenerateGraphIds(clonedGraph);
 		}
 

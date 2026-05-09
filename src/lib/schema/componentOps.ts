@@ -19,7 +19,7 @@ import { hasFileSystemAccess } from './fileOps';
  */
 export function createBlockFile(node: NodeInstance): ComponentFile {
 	// Deep clone and clean params
-	const clonedNode = JSON.parse(JSON.stringify(node));
+	const clonedNode = structuredClone(node);
 	const cleanedNode = cleanNodeForExport(clonedNode);
 
 	// Remove graph property for blocks (only subsystems have graphs)
@@ -48,7 +48,7 @@ export function createSubsystemFile(node: NodeInstance): ComponentFile {
 	}
 
 	// Deep clone and clean params (recursively for nested subsystems)
-	const clonedNode = JSON.parse(JSON.stringify(node));
+	const clonedNode = structuredClone(node);
 	const cleanedNode = cleanNodeForExport(clonedNode);
 
 	return {
