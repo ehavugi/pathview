@@ -36,6 +36,8 @@
 		import { nodeRegistry } from '$lib/nodes';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import { GRID_SIZE, SNAP_GRID, BACKGROUND_GAP } from '$lib/constants/grid';
+	import { DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '$lib/constants/dimensions';
+	import { shallowEqualArray, shallowEqualRecord } from '$lib/utils/shallowEqual';
 	import type { NodeInstance, Connection, Annotation } from '$lib/nodes/types';
 	import type { EventInstance } from '$lib/events/types';
 
@@ -273,8 +275,8 @@
 		if (portIndex >= ports.length) return null;
 
 		const rotation = (nodeData.params?.['_rotation'] as number) || 0;
-		const width = node.measured?.width ?? node.width ?? 80;
-		const height = node.measured?.height ?? node.height ?? 40;
+		const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+		const height = node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT;
 
 		// Calculate port offset from center based on rotation
 		const portCount = ports.length;
@@ -547,8 +549,8 @@
 			}
 			if (currentData.name !== gn.name) return true;
 			if (currentData.color !== gn.color) return true;
-			if (JSON.stringify(currentData.params) !== JSON.stringify(gn.params)) return true;
-			if (JSON.stringify(currentData.pinnedParams) !== JSON.stringify(gn.pinnedParams)) return true;
+			if (!shallowEqualRecord(currentData.params, gn.params)) return true;
+			if (!shallowEqualArray(currentData.pinnedParams, gn.pinnedParams)) return true;
 			return false;
 		});
 
@@ -738,8 +740,8 @@
 				changedNodeIds.add(node.id);
 
 				// Incrementally update grid obstacle for this node
-				const width = node.measured?.width ?? node.width ?? 80;
-				const height = node.measured?.height ?? node.height ?? 40;
+				const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+				const height = node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT;
 				routingStore.updateNodeBounds(node.id, {
 					x: snappedX - width / 2,
 					y: snappedY - height / 2,

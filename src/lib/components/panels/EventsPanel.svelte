@@ -6,6 +6,7 @@
 	import { graphStore } from '$lib/stores/graph';
 	import { historyStore } from '$lib/stores/history';
 	import { screenToFlow } from '$lib/stores/viewActions';
+	import { createHoverDetail } from '$lib/actions/hoverDetail.svelte';
 	import EventPreview from '$lib/components/nodes/EventPreview.svelte';
 
 	interface Props {
@@ -18,7 +19,7 @@
 
 	// Re-derive event types whenever the registry changes (runtime install/uninstall)
 	let registryTick = $state(0);
-	eventRegistryVersion.subscribe((v) => (registryTick = v));
+	const unsubscribeRegistry = eventRegistryVersion.subscribe((v) => (registryTick = v));
 	const eventTypes = $derived.by(() => {
 		void registryTick;
 		return eventRegistry.getAll();
@@ -26,112 +27,30 @@
 
 	// Track if at root level
 	let isAtRoot = $state(true);
-	graphStore.currentPath.subscribe((path) => {
+	const unsubscribePath = graphStore.currentPath.subscribe((path) => {
 		isAtRoot = path.length === 0;
 	});
 
 	// Track drag state to prevent click after drag
 	let isDragging = $state(false);
 
-	// Hover-detail state — same pattern as NodeLibrary.
-	const HOVER_OPEN_DELAY = 250;
-	const HOVER_SWITCH_DELAY = 200;
-	const HOVER_CLOSE_DELAY = 120;
-	let hoveredItem = $state<EventTypeDefinition | null>(null);
-	let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null;
-	let hoverSwitchTimer: ReturnType<typeof setTimeout> | null = null;
-	let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null;
+	const hover = createHoverDetail<EventTypeDefinition>({
+		onChange: (item) => onhoveritem?.(item),
+		onVisibleChange: (visible) => ondetailvisible?.(visible)
+	});
 
-	function clearHoverTimers() {
-		if (hoverOpenTimer !== null) {
-			clearTimeout(hoverOpenTimer);
-			hoverOpenTimer = null;
-		}
-		if (hoverSwitchTimer !== null) {
-			clearTimeout(hoverSwitchTimer);
-			hoverSwitchTimer = null;
-		}
-		if (hoverCloseTimer !== null) {
-			clearTimeout(hoverCloseTimer);
-			hoverCloseTimer = null;
-		}
-	}
+	onDestroy(() => {
+		hover.cleanup();
+		unsubscribeRegistry();
+		unsubscribePath();
+	});
 
-	onDestroy(clearHoverTimers);
+	const handleMouseEnter = (item: EventTypeDefinition) => hover.handleEnter(item);
+	const handleMouseLeave = () => hover.handleLeave();
+	const hideDetailNow = () => hover.hideNow();
 
-	function handleMouseEnter(item: EventTypeDefinition) {
-		if (hoverCloseTimer !== null) {
-			clearTimeout(hoverCloseTimer);
-			hoverCloseTimer = null;
-		}
-		if (hoveredItem === item) {
-			if (hoverSwitchTimer !== null) {
-				clearTimeout(hoverSwitchTimer);
-				hoverSwitchTimer = null;
-			}
-			return;
-		}
-		if (hoveredItem !== null) {
-			if (hoverSwitchTimer !== null) clearTimeout(hoverSwitchTimer);
-			hoverSwitchTimer = setTimeout(() => {
-				hoverSwitchTimer = null;
-				hoveredItem = item;
-				onhoveritem?.(item);
-			}, HOVER_SWITCH_DELAY);
-			return;
-		}
-		if (hoverOpenTimer !== null) clearTimeout(hoverOpenTimer);
-		hoverOpenTimer = setTimeout(() => {
-			hoverOpenTimer = null;
-			hoveredItem = item;
-			onhoveritem?.(item);
-			ondetailvisible?.(true);
-		}, HOVER_OPEN_DELAY);
-	}
-
-	function handleMouseLeave() {
-		if (hoverOpenTimer !== null) {
-			clearTimeout(hoverOpenTimer);
-			hoverOpenTimer = null;
-		}
-		if (hoverSwitchTimer !== null) {
-			clearTimeout(hoverSwitchTimer);
-			hoverSwitchTimer = null;
-		}
-		if (hoveredItem === null) return;
-		if (hoverCloseTimer !== null) clearTimeout(hoverCloseTimer);
-		hoverCloseTimer = setTimeout(() => {
-			hoverCloseTimer = null;
-			hoveredItem = null;
-			onhoveritem?.(null);
-			ondetailvisible?.(false);
-		}, HOVER_CLOSE_DELAY);
-	}
-
-	function hideDetailNow() {
-		clearHoverTimers();
-		const wasShown = hoveredItem !== null;
-		hoveredItem = null;
-		if (wasShown) {
-			onhoveritem?.(null);
-			ondetailvisible?.(false);
-		}
-	}
-
-	export function keepDetailAlive() {
-		if (hoverCloseTimer !== null) {
-			clearTimeout(hoverCloseTimer);
-			hoverCloseTimer = null;
-		}
-		if (hoverSwitchTimer !== null) {
-			clearTimeout(hoverSwitchTimer);
-			hoverSwitchTimer = null;
-		}
-	}
-
-	export function dismissDetail() {
-		handleMouseLeave();
-	}
+	export const keepDetailAlive = () => hover.keepAlive();
+	export const dismissDetail = () => hover.dismiss();
 
 	/**
 	 * Add an event at the current level (root or subsystem)

@@ -243,7 +243,7 @@ export const eventStore = {
 					y: original.position.y + offset.y
 				},
 				// Deep clone params to avoid shared references
-				params: JSON.parse(JSON.stringify(original.params)),
+				params: structuredClone(original.params),
 				color: original.color
 			};
 

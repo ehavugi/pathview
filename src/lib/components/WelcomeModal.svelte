@@ -179,6 +179,8 @@
 							<img
 								src="{base}/examples/screenshots/{example.basename}-{isDark ? 'dark' : 'light'}.png"
 								alt="{example.name} preview"
+								loading="lazy"
+								decoding="async"
 								onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
 							/>
 						</div>

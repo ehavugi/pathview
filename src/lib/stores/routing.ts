@@ -6,7 +6,18 @@ import { writable, derived, get } from 'svelte/store';
 import type { Position } from '$lib/types/common';
 import type { Connection, Waypoint } from '$lib/types/nodes';
 import type { RoutingContext, RouteResult, Bounds, Direction, PortStub } from '$lib/routing';
-import { calculateRoute, calculateRouteWithWaypoints, calculateSimpleRoute, getPathCells, ROUTING_MARGIN } from '$lib/routing';
+import {
+	calculateRoute,
+	calculateRouteWithWaypoints,
+	calculateSimpleRoute,
+	getPathCells,
+	ROUTING_MARGIN,
+	ASYNC_BATCH_SIZE,
+	WAYPOINT_MERGE_THRESHOLD,
+	WAYPOINT_COLLINEAR_THRESHOLD,
+	ROUTING_CONTEXT_PADDING
+} from '$lib/routing';
+import { DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '$lib/constants/dimensions';
 import { SparseGrid } from '$lib/routing/gridBuilder';
 import { generateId } from '$lib/stores/utils';
 import { graphStore } from '$lib/stores/graph';
@@ -53,9 +64,6 @@ function hashRouteInputs(
 	return `${sourcePos.x},${sourcePos.y}|${targetPos.x},${targetPos.y}|${sourceDir}|${targetDir}|${wpHash}`;
 }
 
-/** Number of routes to calculate per async batch before yielding to browser */
-const ASYNC_BATCH_SIZE = 8;
-
 interface RoutingState {
 	/** Cached routes by connection ID */
 	routes: Map<string, RouteResult>;
@@ -76,6 +84,54 @@ const state = writable<RoutingState>({
 
 /** Generation counter — incremented on each recalculateAllRoutes call to cancel stale async work */
 let routingGeneration = 0;
+
+function findConnection(connectionId: string): Connection | undefined {
+	return get(graphStore.connections).find((c) => c.id === connectionId);
+}
+
+/**
+ * Persist new waypoints for a connection, then either recompute the route
+ * synchronously (when port positions are available) or invalidate the cached
+ * route so a fresh calculation runs on the next read.
+ *
+ * Shared by addUserWaypoint, addUserWaypointAtIndex, removeUserWaypoint, and
+ * moveWaypoint — they all do the same thing after they've decided what the
+ * new waypoint list should look like.
+ */
+function applyWaypointUpdate(
+	connection: Connection,
+	updatedWaypoints: Waypoint[],
+	getPortInfo: ((nodeId: string, portIndex: number, isOutput: boolean) => PortInfo | null) | undefined
+): void {
+	graphStore.updateConnectionWaypoints(connection.id, updatedWaypoints);
+
+	if (getPortInfo) {
+		const $state = get(state);
+		const sourceInfo = getPortInfo(connection.sourceNodeId, connection.sourcePortIndex, true);
+		const targetInfo = getPortInfo(connection.targetNodeId, connection.targetPortIndex, false);
+
+		if (sourceInfo && targetInfo) {
+			const userWaypoints = getUserWaypoints(updatedWaypoints);
+			const result = computeRoute(
+				sourceInfo.position,
+				targetInfo.position,
+				sourceInfo.direction,
+				targetInfo.direction,
+				$state.grid,
+				userWaypoints
+			);
+
+			state.update((s) => {
+				const routes = new Map(s.routes);
+				routes.set(connection.id, result);
+				return { ...s, routes };
+			});
+			return;
+		}
+	}
+
+	routingStore.invalidateRoute(connection.id);
+}
 
 /**
  * Routing store - manages route calculations and caching
@@ -493,50 +549,17 @@ export const routingStore = {
 	): string | null {
 		let waypointId: string | null = null;
 		historyStore.mutate(() => {
-			const connections = get(graphStore.connections);
-			const connection = connections.find((c) => c.id === connectionId);
+			const connection = findConnection(connectionId);
 			if (!connection) return;
 
 			waypointId = generateId();
-			const newWaypoint: Waypoint = {
-				id: waypointId,
-				position,
-				isUserWaypoint: true
-			};
+			const newWaypoint: Waypoint = { id: waypointId, position, isUserWaypoint: true };
 
-			// Get existing user waypoints (filter out auto waypoints)
+			// Drop auto waypoints — they'll be regenerated from the new user-waypoint set.
 			const existingUserWaypoints = getUserWaypoints(connection.waypoints);
 			const updatedWaypoints = [...existingUserWaypoints, newWaypoint];
 
-			graphStore.updateConnectionWaypoints(connectionId, updatedWaypoints);
-
-			// Immediately recalculate route if we have port info (prevents full recalc)
-			if (getPortInfo) {
-				const $state = get(state);
-				const sourceInfo = getPortInfo(connection.sourceNodeId, connection.sourcePortIndex, true);
-				const targetInfo = getPortInfo(connection.targetNodeId, connection.targetPortIndex, false);
-
-				if (sourceInfo && targetInfo) {
-					const result = computeRoute(
-						sourceInfo.position,
-						targetInfo.position,
-						sourceInfo.direction,
-						targetInfo.direction,
-						$state.grid,
-						updatedWaypoints
-					);
-
-					state.update((s) => {
-						const routes = new Map(s.routes);
-						routes.set(connectionId, result);
-						return { ...s, routes };
-					});
-					return;
-				}
-			}
-
-			// Fallback: just invalidate
-			routingStore.invalidateRoute(connectionId);
+			applyWaypointUpdate(connection, updatedWaypoints, getPortInfo);
 		});
 		return waypointId;
 	},
@@ -554,56 +577,20 @@ export const routingStore = {
 	): string | null {
 		let waypointId: string | null = null;
 		historyStore.mutate(() => {
-			const connections = get(graphStore.connections);
-			const connection = connections.find((c) => c.id === connectionId);
+			const connection = findConnection(connectionId);
 			if (!connection) return;
 
 			waypointId = generateId();
-			const newWaypoint: Waypoint = {
-				id: waypointId,
-				position,
-				isUserWaypoint: true
-			};
+			const newWaypoint: Waypoint = { id: waypointId, position, isUserWaypoint: true };
 
-			// Get existing user waypoints
 			const existingUserWaypoints = getUserWaypoints(connection.waypoints);
-
-			// Insert at the specified index
 			const updatedWaypoints = [
 				...existingUserWaypoints.slice(0, insertIndex),
 				newWaypoint,
 				...existingUserWaypoints.slice(insertIndex)
 			];
 
-			graphStore.updateConnectionWaypoints(connectionId, updatedWaypoints);
-
-			// Immediately recalculate route if we have port info (prevents full recalc)
-			if (getPortInfo) {
-				const $state = get(state);
-				const sourceInfo = getPortInfo(connection.sourceNodeId, connection.sourcePortIndex, true);
-				const targetInfo = getPortInfo(connection.targetNodeId, connection.targetPortIndex, false);
-
-				if (sourceInfo && targetInfo) {
-					const result = computeRoute(
-						sourceInfo.position,
-						targetInfo.position,
-						sourceInfo.direction,
-						targetInfo.direction,
-						$state.grid,
-						updatedWaypoints
-					);
-
-					state.update((s) => {
-						const routes = new Map(s.routes);
-						routes.set(connectionId, result);
-						return { ...s, routes };
-					});
-					return;
-				}
-			}
-
-			// Fallback: just invalidate
-			routingStore.invalidateRoute(connectionId);
+			applyWaypointUpdate(connection, updatedWaypoints, getPortInfo);
 		});
 		return waypointId;
 	},
@@ -618,49 +605,21 @@ export const routingStore = {
 		getPortInfo?: (nodeId: string, portIndex: number, isOutput: boolean) => PortInfo | null
 	): void {
 		historyStore.mutate(() => {
-			const connections = get(graphStore.connections);
-			const connection = connections.find((c) => c.id === connectionId);
+			const connection = findConnection(connectionId);
 			if (!connection?.waypoints) return;
 
 			const updatedWaypoints = connection.waypoints.filter(
 				(w) => w.id !== waypointId || !w.isUserWaypoint
 			);
 
-			graphStore.updateConnectionWaypoints(connectionId, updatedWaypoints);
-
-			// Immediately recalculate route if we have port info (prevents flicker)
-			if (getPortInfo) {
-				const $state = get(state);
-				const sourceInfo = getPortInfo(connection.sourceNodeId, connection.sourcePortIndex, true);
-				const targetInfo = getPortInfo(connection.targetNodeId, connection.targetPortIndex, false);
-
-				if (sourceInfo && targetInfo) {
-					const userWaypoints = getUserWaypoints(updatedWaypoints);
-					const result = computeRoute(
-						sourceInfo.position,
-						targetInfo.position,
-						sourceInfo.direction,
-						targetInfo.direction,
-						$state.grid,
-						userWaypoints
-					);
-
-					state.update((s) => {
-						const routes = new Map(s.routes);
-						routes.set(connectionId, result);
-						return { ...s, routes };
-					});
-					return;
-				}
-			}
-
-			// Fallback: just invalidate
-			routingStore.invalidateRoute(connectionId);
+			applyWaypointUpdate(connection, updatedWaypoints, getPortInfo);
 		});
 	},
 
 	/**
-	 * Move a waypoint to a new position and recalculate route
+	 * Move a waypoint to a new position and recalculate route.
+	 * Not wrapped in historyStore.mutate — the caller owns the drag transaction
+	 * so a single drag becomes one undo entry rather than one per move event.
 	 * @param getPortInfo - Optional callback to get port info for route recalculation
 	 */
 	moveWaypoint(
@@ -669,44 +628,14 @@ export const routingStore = {
 		newPosition: Position,
 		getPortInfo?: (nodeId: string, portIndex: number, isOutput: boolean) => PortInfo | null
 	): void {
-		const connections = get(graphStore.connections);
-		const connection = connections.find((c) => c.id === connectionId);
+		const connection = findConnection(connectionId);
 		if (!connection?.waypoints) return;
 
 		const updatedWaypoints = connection.waypoints.map((w) =>
 			w.id === waypointId ? { ...w, position: newPosition } : w
 		);
 
-		graphStore.updateConnectionWaypoints(connectionId, updatedWaypoints);
-
-		// If getPortInfo is provided, recalculate route immediately
-		if (getPortInfo) {
-			const $state = get(state);
-			const sourceInfo = getPortInfo(connection.sourceNodeId, connection.sourcePortIndex, true);
-			const targetInfo = getPortInfo(connection.targetNodeId, connection.targetPortIndex, false);
-
-			if (sourceInfo && targetInfo) {
-				const userWaypoints = getUserWaypoints(updatedWaypoints);
-				const result = computeRoute(
-					sourceInfo.position,
-					targetInfo.position,
-					sourceInfo.direction,
-					targetInfo.direction,
-					$state.grid,
-					userWaypoints
-				);
-
-				state.update((s) => {
-					const routes = new Map(s.routes);
-					routes.set(connectionId, result);
-					return { ...s, routes };
-				});
-				return;
-			}
-		}
-
-		// Fallback: just invalidate
-		routingStore.invalidateRoute(connectionId);
+		applyWaypointUpdate(connection, updatedWaypoints, getPortInfo);
 	},
 
 	/**
@@ -734,8 +663,8 @@ export const routingStore = {
 		const sourcePos = sourceInfo?.position || null;
 		const targetPos = targetInfo?.position || null;
 
-		const MERGE_THRESHOLD = 15; // Pixels - merge waypoints closer than this
-		const COLLINEAR_THRESHOLD = 5; // Pixels - consider collinear if deviation less than this
+		const MERGE_THRESHOLD = WAYPOINT_MERGE_THRESHOLD;
+		const COLLINEAR_THRESHOLD = WAYPOINT_COLLINEAR_THRESHOLD;
 
 		// Helper to check if point is collinear with prev and next
 		const isCollinear = (prev: Position, curr: Position, next: Position): boolean => {
@@ -856,7 +785,7 @@ export const routingStore = {
  */
 export function buildRoutingContext(
 	nodes: Array<{ id: string; position: Position; width?: number; height?: number; measured?: { width?: number; height?: number } }>,
-	padding = 100
+	padding = ROUTING_CONTEXT_PADDING
 ): { nodeBounds: Map<string, Bounds>; canvasBounds: Bounds } {
 	const nodeBounds = new Map<string, Bounds>();
 
@@ -866,8 +795,8 @@ export function buildRoutingContext(
 	let maxY = -Infinity;
 
 	for (const node of nodes) {
-		const width = node.measured?.width ?? node.width ?? 80;
-		const height = node.measured?.height ?? node.height ?? 40;
+		const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH;
+		const height = node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT;
 
 		// Node position is center (nodeOrigin = [0.5, 0.5])
 		const left = node.position.x - width / 2;

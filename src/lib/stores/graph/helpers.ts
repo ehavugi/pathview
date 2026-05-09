@@ -195,12 +195,12 @@ export function cloneNode(
 			node.outputs.map((p) => ({ name: p.name, color: p.color }))
 		),
 		// Deep clone params to avoid shared references
-		params: JSON.parse(JSON.stringify(node.params)),
+		params: structuredClone(node.params),
 		// Copy pinnedParams array if present
 		pinnedParams: node.pinnedParams ? [...node.pinnedParams] : undefined,
 		color: node.color,
 		// Deep clone graph for subsystems
-		graph: node.graph ? JSON.parse(JSON.stringify(node.graph)) : undefined
+		graph: node.graph ? structuredClone(node.graph) : undefined
 	};
 }
 

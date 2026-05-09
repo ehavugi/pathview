@@ -163,7 +163,7 @@ async function copy(): Promise<boolean> {
 	for (const id of selectedNodeIds) {
 		const annotation = graphStore.getAnnotation(id);
 		if (annotation) {
-			copiedAnnotations.push(JSON.parse(JSON.stringify(annotation)));
+			copiedAnnotations.push(structuredClone(annotation));
 		}
 	}
 
@@ -187,7 +187,7 @@ async function copy(): Promise<boolean> {
 	for (const id of actualNodeIds) {
 		const node = nodesMap.get(id);
 		if (node && node.type !== NODE_TYPES.INTERFACE) {
-			copiedNodes.push(JSON.parse(JSON.stringify(node)));
+			copiedNodes.push(structuredClone(node));
 		}
 	}
 
@@ -195,7 +195,7 @@ async function copy(): Promise<boolean> {
 	const copiedConnections: Connection[] = [];
 	for (const conn of connections) {
 		if (actualNodeIds.has(conn.sourceNodeId) && actualNodeIds.has(conn.targetNodeId)) {
-			copiedConnections.push(JSON.parse(JSON.stringify(conn)));
+			copiedConnections.push(structuredClone(conn));
 		}
 	}
 
@@ -205,7 +205,7 @@ async function copy(): Promise<boolean> {
 		for (const id of selectedEventIds) {
 			const event = eventStore.getEvent(id);
 			if (event) {
-				copiedEvents.push(JSON.parse(JSON.stringify(event)));
+				copiedEvents.push(structuredClone(event));
 			}
 		}
 	} else {
@@ -213,7 +213,7 @@ async function copy(): Promise<boolean> {
 		for (const id of selectedEventIds) {
 			const event = graphStore.getSubsystemEvent(id);
 			if (event) {
-				copiedEvents.push(JSON.parse(JSON.stringify(event)));
+				copiedEvents.push(structuredClone(event));
 			}
 		}
 	}

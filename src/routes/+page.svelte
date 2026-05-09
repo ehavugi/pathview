@@ -173,7 +173,7 @@
 	let showEventsPanel = $state(false);
 	let showSubsystemTree = $state(false);
 	let hasAnySubsystem = $state(false);
-	graphStore.subsystemTree.subscribe((tree) => {
+	const unsubSubsystemTree = graphStore.subsystemTree.subscribe((tree) => {
 		const next = tree.length > 0;
 		if (!next && showSubsystemTree) showSubsystemTree = false;
 		hasAnySubsystem = next;
@@ -684,6 +684,7 @@
 			cleanupAutoSave();
 			unsubNodes();
 			unsubConnections();
+			unsubSubsystemTree();
 			window.removeEventListener('run-simulation', handleRunSimulation);
 			window.removeEventListener('continue-simulation', handleContinueSimulation);
 		};
