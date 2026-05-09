@@ -36,6 +36,7 @@
 		import { nodeRegistry } from '$lib/nodes';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import { GRID_SIZE, SNAP_GRID, BACKGROUND_GAP } from '$lib/constants/grid';
+	import { shallowEqualArray, shallowEqualRecord } from '$lib/utils/shallowEqual';
 	import type { NodeInstance, Connection, Annotation } from '$lib/nodes/types';
 	import type { EventInstance } from '$lib/events/types';
 
@@ -547,8 +548,8 @@
 			}
 			if (currentData.name !== gn.name) return true;
 			if (currentData.color !== gn.color) return true;
-			if (JSON.stringify(currentData.params) !== JSON.stringify(gn.params)) return true;
-			if (JSON.stringify(currentData.pinnedParams) !== JSON.stringify(gn.pinnedParams)) return true;
+			if (!shallowEqualRecord(currentData.params, gn.params)) return true;
+			if (!shallowEqualArray(currentData.pinnedParams, gn.pinnedParams)) return true;
 			return false;
 		});
 
