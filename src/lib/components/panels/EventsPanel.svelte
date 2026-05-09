@@ -18,7 +18,7 @@
 
 	// Re-derive event types whenever the registry changes (runtime install/uninstall)
 	let registryTick = $state(0);
-	eventRegistryVersion.subscribe((v) => (registryTick = v));
+	const unsubscribeRegistry = eventRegistryVersion.subscribe((v) => (registryTick = v));
 	const eventTypes = $derived.by(() => {
 		void registryTick;
 		return eventRegistry.getAll();
@@ -26,7 +26,7 @@
 
 	// Track if at root level
 	let isAtRoot = $state(true);
-	graphStore.currentPath.subscribe((path) => {
+	const unsubscribePath = graphStore.currentPath.subscribe((path) => {
 		isAtRoot = path.length === 0;
 	});
 
@@ -57,7 +57,11 @@
 		}
 	}
 
-	onDestroy(clearHoverTimers);
+	onDestroy(() => {
+		clearHoverTimers();
+		unsubscribeRegistry();
+		unsubscribePath();
+	});
 
 	function handleMouseEnter(item: EventTypeDefinition) {
 		if (hoverCloseTimer !== null) {
