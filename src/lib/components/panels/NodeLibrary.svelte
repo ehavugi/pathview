@@ -21,7 +21,7 @@
 	// Registry change counter — read it inside derived blocks so they re-run
 	// whenever a toolbox install/uninstall mutates the registry.
 	let registryTick = $state(0);
-	registryVersion.subscribe((v) => (registryTick = v));
+	const unsubscribeRegistry = registryVersion.subscribe((v) => (registryTick = v));
 
 	// Search query
 	let searchQuery = $state('');
@@ -64,7 +64,10 @@
 		}
 	}
 
-	onDestroy(clearHoverTimers);
+	onDestroy(() => {
+		clearHoverTimers();
+		unsubscribeRegistry();
+	});
 
 	// Collapsed categories
 	let collapsedCategories = $state<Set<string>>(new Set());
