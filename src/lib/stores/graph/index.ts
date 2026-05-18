@@ -84,6 +84,7 @@ export const graphStore = {
 	removeInputPort: ports.removeInputPort,
 	addOutputPort: ports.addOutputPort,
 	removeOutputPort: ports.removeOutputPort,
+	updateNodePortName: ports.updateNodePortName,
 
 	// ==================== ANNOTATION OPERATIONS ====================
 	addAnnotation: annotations.addAnnotation,

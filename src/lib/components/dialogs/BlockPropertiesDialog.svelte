@@ -21,9 +21,12 @@
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
 	import { exportRecordingData } from '$lib/utils/csvExport';
 	import { createRecordingDataState } from '$lib/stores/recordingData.svelte';
+	import { getPortLabelConfigs } from '$lib/nodes/uiConfig';
+	import { PORT_NAME } from '$lib/constants/handles';
 
 	// Code preview state (declared early — referenced by subscription below)
 	let showCode = $state(false);
+	let showPortLabels = $state(false);
 	let previewCode = $state('');
 	let editorContainer = $state<HTMLDivElement | undefined>(undefined);
 	let editorView: import('@codemirror/view').EditorView | null = null;
@@ -49,10 +52,12 @@
 			node = graphStore.getNode(id) || null;
 			// Reset to properties view when opening a new node
 			showCode = false;
+			showPortLabels = false;
 			destroyEditor();
 		} else {
 			node = null;
 			showCode = false;
+			showPortLabels = false;
 			destroyEditor();
 		}
 	});
@@ -144,8 +149,20 @@
 			const blockCode = generateBlockCode(node, allNodes, allConnections);
 			previewCode = header + blockCode;
 			copied = false;
+			showPortLabels = false;
 			showCode = true;
 			setTimeout(() => initEditor(), 0);
+		}
+	}
+
+	// Toggle port-labels view (same mutual-exclusion pattern as code view)
+	function togglePortLabelsView() {
+		if (showPortLabels) {
+			showPortLabels = false;
+		} else {
+			showCode = false;
+			destroyEditor();
+			showPortLabels = true;
 		}
 	}
 
@@ -175,6 +192,24 @@
 		historyStore.mutate(() => graphStore.updateNodeParams(id, { _hidden: true }));
 		// Dialog targets a node that's now invisible; close it.
 		closeNodeDialog();
+	}
+
+	// Port-label editing — hide for blocks whose port names are driven by a
+	// regular param (Scope.labels, Adder.operations, …); for those the param
+	// itself is the source of truth and editing port names directly would be
+	// overwritten on the next param change.
+	const hasParamDrivenPortLabels = $derived(node ? getPortLabelConfigs(node.type).length > 0 : false);
+	const hasEditablePortLabels = $derived(
+		!!node && !hasParamDrivenPortLabels && (node.inputs.length > 0 || node.outputs.length > 0)
+	);
+
+	function handlePortNameChange(direction: 'input' | 'output', index: number, value: string) {
+		if (!node) return;
+		const id = node.id;
+		const trimmed = value.trim();
+		const fallback = direction === 'input' ? PORT_NAME.input(index) : PORT_NAME.output(index);
+		const name = trimmed === '' ? fallback : trimmed;
+		historyStore.mutate(() => graphStore.updateNodePortName(id, direction, index, name));
 	}
 
 	// Check if node is a recording node (Scope or Spectrum)
@@ -256,6 +291,8 @@
 		<div class="dialog-header">
 				{#if showCode}
 					<span id="dialog-title">Python Code</span>
+				{:else if showPortLabels}
+					<span id="dialog-title">Port Labels</span>
 				{:else}
 					<div class="node-info">
 						<input
@@ -286,7 +323,7 @@
 								<Icon name="copy" size={16} />
 							{/if}
 						</button>
-					{:else}
+					{:else if !showPortLabels}
 						<!-- Color picker -->
 						<ColorPicker
 							currentColor={currentColor}
@@ -328,15 +365,28 @@
 							</button>
 						{/if}
 					{/if}
-					<!-- Toggle code view button -->
-					<button
-						class="icon-btn"
-						onclick={toggleCodeView}
-						use:tooltip={showCode ? "View Properties" : "View Python Code"}
-						aria-label={showCode ? "View Properties" : "View Python Code"}
-					>
-						<Icon name={showCode ? "settings" : "braces"} size={16} />
-					</button>
+					<!-- Toggle port labels view button (hidden in code view) -->
+					{#if showPortLabels || (!showCode && hasEditablePortLabels)}
+						<button
+							class="icon-btn"
+							onclick={togglePortLabelsView}
+							use:tooltip={showPortLabels ? "View Properties" : "Edit Port Labels"}
+							aria-label={showPortLabels ? "View Properties" : "Edit Port Labels"}
+						>
+							<Icon name={showPortLabels ? "settings" : "tag"} size={16} />
+						</button>
+					{/if}
+					<!-- Toggle code view button (hidden in port-labels view) -->
+					{#if !showPortLabels}
+						<button
+							class="icon-btn"
+							onclick={toggleCodeView}
+							use:tooltip={showCode ? "View Properties" : "View Python Code"}
+							aria-label={showCode ? "View Properties" : "View Python Code"}
+						>
+							<Icon name={showCode ? "settings" : "braces"} size={16} />
+						</button>
+					{/if}
 					<button class="icon-btn" onclick={closeNodeDialog} aria-label="Close">
 						<Icon name="x" size={16} />
 					</button>
@@ -351,6 +401,43 @@
 							<div class="loading">Loading...</div>
 						{/if}
 					</div>
+				{:else if showPortLabels}
+					<!-- Port labels view -->
+					{#if node.inputs.length === 0 && node.outputs.length === 0}
+						<div class="no-params">No ports to label</div>
+					{:else}
+						<div class="section">
+							<div class="params-grid">
+								{#each node.inputs as port, i (port.id)}
+									<div class="param-item">
+										<label for="port-in-{i}">in {i}</label>
+										<input
+											id="port-in-{i}"
+											type="text"
+											value={port.name}
+											placeholder={PORT_NAME.input(i)}
+											onchange={(e) => handlePortNameChange('input', i, e.currentTarget.value)}
+										/>
+									</div>
+								{/each}
+								{#if node.inputs.length > 0 && node.outputs.length > 0}
+									<div class="port-divider"></div>
+								{/if}
+								{#each node.outputs as port, i (port.id)}
+									<div class="param-item">
+										<label for="port-out-{i}">out {i}</label>
+										<input
+											id="port-out-{i}"
+											type="text"
+											value={port.name}
+											placeholder={PORT_NAME.output(i)}
+											onchange={(e) => handlePortNameChange('output', i, e.currentTarget.value)}
+										/>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				{:else}
 					<!-- Parameters -->
 					{#if typeDef.params.length > 0}
@@ -413,7 +500,7 @@
 				{/if}
 			</div>
 
-		{#if !showCode}
+		{#if !showCode && !showPortLabels}
 			<div class="dialog-footer">
 				<span class="hint">R rotate · X flip horizontal · Y flip vertical</span>
 			</div>
@@ -434,6 +521,13 @@
 	.param-input-row > :first-child {
 		flex: 1;
 		min-width: 0;
+	}
+
+	.port-divider {
+		height: 1px;
+		background: var(--border);
+		/* Extend past the dialog-body padding so the line spans edge-to-edge. */
+		margin: var(--space-xs) calc(-1 * var(--space-md));
 	}
 
 	/* Pin button */
