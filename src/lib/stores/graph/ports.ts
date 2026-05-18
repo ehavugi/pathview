@@ -331,3 +331,47 @@ export function syncPortNamesFromLabels(
 		updateNodeById(nodeId, () => updated);
 	}
 }
+
+/**
+ * Rename a single port. For regular nodes this writes the new name into
+ * `node.{inputs|outputs}[index].name`. For Interface nodes, port names are
+ * derived from the parent Subsystem at read time, so we write to the parent
+ * instead (with the direction flipped, because Interface input ↔ Subsystem
+ * output).
+ */
+export function updateNodePortName(
+	nodeId: string,
+	direction: PortDirection,
+	index: number,
+	name: string
+): void {
+	const currentGraph = getCurrentGraph();
+	const node = currentGraph.nodes.get(nodeId);
+	if (!node) return;
+
+	const path = get(currentPath);
+
+	if (node.type === NODE_TYPES.INTERFACE && path.length > 0) {
+		const parentId = path[path.length - 1];
+		const parentPath = path.slice(0, -1);
+		const parentPortsKey = direction === 'input' ? 'outputs' : 'inputs';
+
+		updateParentSubsystem(parentPath, parentId, (parent) => {
+			const ports = parent[parentPortsKey] as PortInstance[];
+			if (index < 0 || index >= ports.length) return parent;
+			if (ports[index].name === name) return parent;
+			const newPorts = ports.map((p, i) => (i === index ? { ...p, name } : p));
+			return { ...parent, [parentPortsKey]: newPorts };
+		});
+		return;
+	}
+
+	updateNodeById(nodeId, (n) => {
+		const portsKey = direction === 'input' ? 'inputs' : 'outputs';
+		const ports = n[portsKey] as PortInstance[];
+		if (index < 0 || index >= ports.length) return n;
+		if (ports[index].name === name) return n;
+		const newPorts = ports.map((p, i) => (i === index ? { ...p, name } : p));
+		return { ...n, [portsKey]: newPorts };
+	});
+}

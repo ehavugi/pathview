@@ -95,11 +95,13 @@ export function getCurrentGraph(): {
 				...node,
 				name: subsystem.name,
 				color: subsystem.color,
-				// Subsystem inputs → Interface outputs (signals coming in)
+				// Subsystem inputs → Interface outputs (signals coming in).
+				// Port names come from the parent — that's the single source
+				// of truth so user-customised labels survive across renders.
 				outputs: subsystem.inputs.map((port, i) => ({
 					id: `${node.id}-output-${i}`,
 					nodeId: node.id,
-					name: `in ${i}`,
+					name: port.name,
 					direction: 'output' as const,
 					index: i,
 					color: port.color
@@ -108,7 +110,7 @@ export function getCurrentGraph(): {
 				inputs: subsystem.outputs.map((port, i) => ({
 					id: `${node.id}-input-${i}`,
 					nodeId: node.id,
-					name: `out ${i}`,
+					name: port.name,
 					direction: 'input' as const,
 					index: i,
 					color: port.color
