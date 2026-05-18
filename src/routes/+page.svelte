@@ -49,7 +49,9 @@
 	import { initBackendFromUrl, autoDetectBackend } from '$lib/pyodide/backend';
 	import { runGraphStreamingSimulation, validateGraphSimulation, exportToPython } from '$lib/pyodide/pathsimRunner';
 	import { consoleStore } from '$lib/stores/console';
-	import { newGraph, saveFile, saveAsFile, setupAutoSave, clearAutoSave, debouncedAutoSave, openImportDialog, importFromUrl, currentFileName } from '$lib/schema/fileOps';
+	import { newGraph, saveFile, saveAsFile, setupAutoSave, clearAutoSave, debouncedAutoSave, openImportDialog, importFromUrl, currentFileName, loadGraphFile, listRecentFiles, openRecentFile, removeRecentFile } from '$lib/schema/fileOps';
+	import { AUTOSAVE_KEY, kvGet, hasFileSystemAccess, type RecentFile } from '$lib/schema/handleStore';
+	import type { GraphFile } from '$lib/nodes/types';
 	import { confirmationStore } from '$lib/stores/confirmation';
 	import ConfirmationModal from '$lib/components/ConfirmationModal.svelte';
 	import { triggerFitView, triggerZoomIn, triggerZoomOut, triggerPan, getViewportCenter, screenToFlow, triggerClearSelection, triggerNudge, hasAnySelection, setFitViewPadding, triggerFlyInAnimation } from '$lib/stores/viewActions';
@@ -647,8 +649,12 @@
 			consoleLogCount = logs.length;
 		});
 
-		// Always start with clean slate
-		clearAutoSave();
+		// Snapshot the previous session's autosave (if any) *before* setting up
+		// subscriptions, so the upcoming subscribe-fire / debounced writes
+		// cannot race-overwrite it in IDB while the user is still answering
+		// the Restore prompt. We keep the snapshot in memory and reload from
+		// there on confirm.
+		const initialAutosavePromise = kvGet<GraphFile>(AUTOSAVE_KEY);
 
 		// Setup periodic autosave (backup)
 		const cleanupAutoSave = setupAutoSave(30000);
@@ -670,6 +676,30 @@
 		};
 		window.addEventListener('run-simulation', handleRunSimulation);
 		window.addEventListener('continue-simulation', handleContinueSimulation);
+
+		// Offer to restore the previous session's autosave (skip if a URL
+		// model is loading — that takes precedence over restore).
+		void (async () => {
+			const snapshot = await initialAutosavePromise;
+			if (!snapshot || urlModelConfig) return;
+			const ok = await confirmationStore.show({
+				title: 'Restore last session?',
+				message: 'PathView found an autosaved version of your last session. Restore it?',
+				confirmText: 'Restore',
+				cancelText: 'Discard'
+			});
+			if (ok) {
+				try {
+					await loadGraphFile(snapshot);
+					setTimeout(() => triggerFitView(), 100);
+				} catch (e) {
+					console.warn('Failed to restore autosave:', e);
+					await clearAutoSave();
+				}
+			} else {
+				await clearAutoSave();
+			}
+		})();
 
 		return () => {
 			// Cleanup store subscriptions
@@ -1045,6 +1075,64 @@
 		}
 	}
 
+	// ── Recent files hover menu ──────────────────────────────────────────────
+	const recentFilesSupported = hasFileSystemAccess();
+	let recentFiles = $state<RecentFile[]>([]);
+	let recentFilesMenuOpen = $state(false);
+	let recentOpenTimer: ReturnType<typeof setTimeout> | null = null;
+	let recentCloseTimer: ReturnType<typeof setTimeout> | null = null;
+	const RECENT_HOVER_OPEN_MS = 250;
+	const RECENT_HOVER_CLOSE_MS = 180;
+
+	function clearRecentTimers() {
+		if (recentOpenTimer) {
+			clearTimeout(recentOpenTimer);
+			recentOpenTimer = null;
+		}
+		if (recentCloseTimer) {
+			clearTimeout(recentCloseTimer);
+			recentCloseTimer = null;
+		}
+	}
+
+	function handleOpenGroupEnter() {
+		if (!recentFilesSupported) return;
+		clearRecentTimers();
+		recentOpenTimer = setTimeout(async () => {
+			recentOpenTimer = null;
+			const list = await listRecentFiles();
+			if (list.length === 0) return; // no menu when empty
+			recentFiles = list;
+			recentFilesMenuOpen = true;
+		}, RECENT_HOVER_OPEN_MS);
+	}
+
+	function handleOpenGroupLeave() {
+		clearRecentTimers();
+		recentCloseTimer = setTimeout(() => {
+			recentFilesMenuOpen = false;
+			recentCloseTimer = null;
+		}, RECENT_HOVER_CLOSE_MS);
+	}
+
+	async function handleOpenRecent(id: string) {
+		clearRecentTimers();
+		recentFilesMenuOpen = false;
+		const result = await openRecentFile(id);
+		if (result.success && result.type === 'model') {
+			setTimeout(() => triggerFitView(), 100);
+		} else if (result.error) {
+			consoleStore.error(`[open recent] ${result.error}`);
+		}
+	}
+
+	async function handleRemoveRecent(id: string, e: MouseEvent) {
+		e.stopPropagation();
+		await removeRecentFile(id);
+		recentFiles = await listRecentFiles();
+		if (recentFiles.length === 0) recentFilesMenuOpen = false;
+	}
+
 	/**
 	 * Expand GitHub shorthand to raw.githubusercontent.com URL
 	 * Format: owner/repo/path/to/file.pvm
@@ -1214,9 +1302,35 @@
 			<button class="toolbar-btn" onclick={handleNew} use:tooltip={"New"} aria-label="New">
 				<Icon name="new-canvas" size={16} />
 			</button>
-			<button class="toolbar-btn" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
-				<Icon name="download" size={16} />
-			</button>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="open-group"
+				onmouseenter={handleOpenGroupEnter}
+				onmouseleave={handleOpenGroupLeave}
+			>
+				<button class="toolbar-btn" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
+					<Icon name="download" size={16} />
+				</button>
+				{#if recentFilesSupported && recentFilesMenuOpen}
+					<div class="recent-menu" role="menu">
+						<div class="recent-menu-header">Recent files</div>
+						{#each recentFiles as recent (recent.id)}
+							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<div class="recent-item" role="menuitem" tabindex="0" onclick={() => handleOpenRecent(recent.id)}>
+								<Icon name="file" size={14} />
+								<span class="recent-name" title={recent.name}>{recent.name}</span>
+								<button
+									class="recent-remove"
+									onclick={(e) => handleRemoveRecent(recent.id, e)}
+									aria-label="Remove from recents"
+								>
+									<Icon name="x" size={12} />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
 			<button
 				class="toolbar-btn"
 				onclick={() => handleSave()}
@@ -1729,6 +1843,98 @@
 
 	.toolbar-btn.stage-btn {
 		position: relative;
+	}
+
+	/* Open button + hover-revealed recent-files menu */
+	.open-group {
+		position: relative;
+	}
+
+	.recent-menu {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		/* Top padding bridges the gap so the mouse can cross from button to
+		   menu without triggering mouseleave. The other sides are inner
+		   panel padding so item hover doesn't touch the rounded panel edge. */
+		padding: 4px 4px 4px 4px;
+		min-width: 240px;
+		max-width: 360px;
+		z-index: var(--z-popover, 1000);
+	}
+
+	.recent-menu::before {
+		content: '';
+		display: block;
+		background: var(--surface-raised);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-md, 0 6px 16px rgba(0, 0, 0, 0.25));
+		position: absolute;
+		inset: 4px 0 0 0;
+		z-index: -1;
+	}
+
+	.recent-menu-header {
+		padding: 6px 10px 4px;
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-disabled);
+	}
+
+	.recent-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 10px;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 11px;
+		transition: background var(--transition-fast);
+	}
+
+	.recent-item:hover,
+	.recent-item:focus-visible {
+		background: var(--surface-hover);
+		color: var(--text);
+		outline: none;
+	}
+
+	.recent-name {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.recent-remove {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-sm, 4px);
+		opacity: 0;
+		transition: opacity var(--transition-fast), color var(--transition-fast);
+	}
+
+	.recent-item:hover .recent-remove,
+	.recent-item:focus-within .recent-remove {
+		opacity: 1;
+	}
+
+	.recent-remove:hover {
+		color: var(--error);
+		background: color-mix(in srgb, var(--error) 15%, transparent);
 	}
 
 	.mutation-badge {
