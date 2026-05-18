@@ -1854,9 +1854,10 @@
 		position: absolute;
 		top: 100%;
 		left: 0;
-		/* Bridge the gap so the mouse can cross from button to menu without
-		   triggering mouseleave on the wrapper. */
-		padding-top: 4px;
+		/* Top padding bridges the gap so the mouse can cross from button to
+		   menu without triggering mouseleave. The other sides are inner
+		   panel padding so item hover doesn't touch the rounded panel edge. */
+		padding: 4px 4px 4px 4px;
 		min-width: 240px;
 		max-width: 360px;
 		z-index: var(--z-popover, 1000);
@@ -1898,6 +1899,7 @@
 	.recent-item:hover,
 	.recent-item:focus-visible {
 		background: var(--surface-hover);
+		color: var(--text);
 		outline: none;
 	}
 
