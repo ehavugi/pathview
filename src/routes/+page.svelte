@@ -1887,17 +1887,17 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 6px 8px;
-		border-radius: var(--radius-sm, 4px);
+		padding: 6px 10px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		color: var(--text-muted);
-		font-size: 12px;
+		font-size: 11px;
+		transition: background var(--transition-fast);
 	}
 
 	.recent-item:hover,
 	.recent-item:focus-visible {
-		background: var(--surface);
-		color: var(--text);
+		background: var(--surface-hover);
 		outline: none;
 	}
 
