@@ -95,6 +95,7 @@ jobs:
           publish_dir: ./build
           destination_dir: dev
           keep_files: true
+          cname: pathview.havugimana.com
 
       - name: Deploy release to root
         if: steps.deploy-type.outputs.type == 'release'
@@ -104,4 +105,5 @@ jobs:
           publish_branch: deployment
           publish_dir: ./build
           keep_files: true
+          cname: pathview.havugimana.com
           exclude_assets: 'dev/**'
