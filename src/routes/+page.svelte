@@ -1075,21 +1075,48 @@
 		}
 	}
 
-	// ── Recent files menu ────────────────────────────────────────────────────
+	// ── Recent files hover menu ──────────────────────────────────────────────
 	const recentFilesSupported = hasFileSystemAccess();
 	let recentFiles = $state<RecentFile[]>([]);
 	let recentFilesMenuOpen = $state(false);
+	let recentOpenTimer: ReturnType<typeof setTimeout> | null = null;
+	let recentCloseTimer: ReturnType<typeof setTimeout> | null = null;
+	const RECENT_HOVER_OPEN_MS = 250;
+	const RECENT_HOVER_CLOSE_MS = 180;
 
-	async function toggleRecentFilesMenu() {
-		if (recentFilesMenuOpen) {
-			recentFilesMenuOpen = false;
-			return;
+	function clearRecentTimers() {
+		if (recentOpenTimer) {
+			clearTimeout(recentOpenTimer);
+			recentOpenTimer = null;
 		}
-		recentFiles = await listRecentFiles();
-		recentFilesMenuOpen = true;
+		if (recentCloseTimer) {
+			clearTimeout(recentCloseTimer);
+			recentCloseTimer = null;
+		}
+	}
+
+	function handleOpenGroupEnter() {
+		if (!recentFilesSupported) return;
+		clearRecentTimers();
+		recentOpenTimer = setTimeout(async () => {
+			recentOpenTimer = null;
+			const list = await listRecentFiles();
+			if (list.length === 0) return; // no menu when empty
+			recentFiles = list;
+			recentFilesMenuOpen = true;
+		}, RECENT_HOVER_OPEN_MS);
+	}
+
+	function handleOpenGroupLeave() {
+		clearRecentTimers();
+		recentCloseTimer = setTimeout(() => {
+			recentFilesMenuOpen = false;
+			recentCloseTimer = null;
+		}, RECENT_HOVER_CLOSE_MS);
 	}
 
 	async function handleOpenRecent(id: string) {
+		clearRecentTimers();
 		recentFilesMenuOpen = false;
 		const result = await openRecentFile(id);
 		if (result.success && result.type === 'model') {
@@ -1104,10 +1131,6 @@
 		await removeRecentFile(id);
 		recentFiles = await listRecentFiles();
 		if (recentFiles.length === 0) recentFilesMenuOpen = false;
-	}
-
-	function handleRecentMenuBackdropClick() {
-		recentFilesMenuOpen = false;
 	}
 
 	/**
@@ -1279,46 +1302,33 @@
 			<button class="toolbar-btn" onclick={handleNew} use:tooltip={"New"} aria-label="New">
 				<Icon name="new-canvas" size={16} />
 			</button>
-			<div class="open-group">
-				<button class="toolbar-btn open-main" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="open-group"
+				onmouseenter={handleOpenGroupEnter}
+				onmouseleave={handleOpenGroupLeave}
+			>
+				<button class="toolbar-btn" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
 					<Icon name="download" size={16} />
 				</button>
-				{#if recentFilesSupported}
-					<button
-						class="toolbar-btn open-caret"
-						class:active={recentFilesMenuOpen}
-						onclick={toggleRecentFilesMenu}
-						use:tooltip={"Recent files"}
-						aria-label="Recent files"
-						aria-haspopup="menu"
-						aria-expanded={recentFilesMenuOpen}
-					>
-						<Icon name="chevron-down" size={12} />
-					</button>
-					{#if recentFilesMenuOpen}
-						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-						<div class="recent-menu-backdrop" onclick={handleRecentMenuBackdropClick}></div>
-						<div class="recent-menu" role="menu">
-							{#if recentFiles.length === 0}
-								<div class="recent-empty">No recent files yet</div>
-							{:else}
-								{#each recentFiles as recent (recent.id)}
-									<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-									<div class="recent-item" role="menuitem" tabindex="0" onclick={() => handleOpenRecent(recent.id)}>
-										<Icon name="file" size={14} />
-										<span class="recent-name" title={recent.name}>{recent.name}</span>
-										<button
-											class="recent-remove"
-											onclick={(e) => handleRemoveRecent(recent.id, e)}
-											aria-label="Remove from recents"
-										>
-											<Icon name="x" size={12} />
-										</button>
-									</div>
-								{/each}
-							{/if}
-						</div>
-					{/if}
+				{#if recentFilesSupported && recentFilesMenuOpen}
+					<div class="recent-menu" role="menu">
+						<div class="recent-menu-header">Recent files</div>
+						{#each recentFiles as recent (recent.id)}
+							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<div class="recent-item" role="menuitem" tabindex="0" onclick={() => handleOpenRecent(recent.id)}>
+								<Icon name="file" size={14} />
+								<span class="recent-name" title={recent.name}>{recent.name}</span>
+								<button
+									class="recent-remove"
+									onclick={(e) => handleRemoveRecent(recent.id, e)}
+									aria-label="Remove from recents"
+								>
+									<Icon name="x" size={12} />
+								</button>
+							</div>
+						{/each}
+					</div>
 				{/if}
 			</div>
 			<button
@@ -1835,46 +1845,42 @@
 		position: relative;
 	}
 
-	/* Open + recent-files caret as a tight pair */
+	/* Open button + hover-revealed recent-files menu */
 	.open-group {
 		position: relative;
-		display: flex;
-		gap: 1px;
-	}
-
-	.open-caret {
-		width: 16px;
-		border-radius: var(--radius-md);
-		padding: 0;
-	}
-
-	.recent-menu-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: var(--z-popover, 1000);
 	}
 
 	.recent-menu {
 		position: absolute;
-		top: calc(100% + 4px);
-		right: 0;
+		top: 100%;
+		left: 0;
+		/* Bridge the gap so the mouse can cross from button to menu without
+		   triggering mouseleave on the wrapper. */
+		padding-top: 4px;
 		min-width: 240px;
 		max-width: 360px;
+		z-index: var(--z-popover, 1000);
+	}
+
+	.recent-menu::before {
+		content: '';
+		display: block;
 		background: var(--surface-raised);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		box-shadow: var(--shadow-md, 0 6px 16px rgba(0, 0, 0, 0.25));
-		padding: 4px;
-		z-index: calc(var(--z-popover, 1000) + 1);
-		max-height: 320px;
-		overflow-y: auto;
+		position: absolute;
+		inset: 4px 0 0 0;
+		z-index: -1;
 	}
 
-	.recent-empty {
-		padding: 8px 10px;
-		font-size: 11px;
-		color: var(--text-muted);
-		text-align: center;
+	.recent-menu-header {
+		padding: 6px 10px 4px;
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-disabled);
 	}
 
 	.recent-item {
