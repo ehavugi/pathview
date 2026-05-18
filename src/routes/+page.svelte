@@ -49,8 +49,8 @@
 	import { initBackendFromUrl, autoDetectBackend } from '$lib/pyodide/backend';
 	import { runGraphStreamingSimulation, validateGraphSimulation, exportToPython } from '$lib/pyodide/pathsimRunner';
 	import { consoleStore } from '$lib/stores/console';
-	import { newGraph, saveFile, saveAsFile, setupAutoSave, clearAutoSave, debouncedAutoSave, openImportDialog, importFromUrl, currentFileName, loadGraphFile } from '$lib/schema/fileOps';
-	import { AUTOSAVE_KEY, kvGet } from '$lib/schema/handleStore';
+	import { newGraph, saveFile, saveAsFile, setupAutoSave, clearAutoSave, debouncedAutoSave, openImportDialog, importFromUrl, currentFileName, loadGraphFile, listRecentFiles, openRecentFile, removeRecentFile } from '$lib/schema/fileOps';
+	import { AUTOSAVE_KEY, kvGet, hasFileSystemAccess, type RecentFile } from '$lib/schema/handleStore';
 	import type { GraphFile } from '$lib/nodes/types';
 	import { confirmationStore } from '$lib/stores/confirmation';
 	import ConfirmationModal from '$lib/components/ConfirmationModal.svelte';
@@ -1075,6 +1075,41 @@
 		}
 	}
 
+	// ── Recent files menu ────────────────────────────────────────────────────
+	const recentFilesSupported = hasFileSystemAccess();
+	let recentFiles = $state<RecentFile[]>([]);
+	let recentFilesMenuOpen = $state(false);
+
+	async function toggleRecentFilesMenu() {
+		if (recentFilesMenuOpen) {
+			recentFilesMenuOpen = false;
+			return;
+		}
+		recentFiles = await listRecentFiles();
+		recentFilesMenuOpen = true;
+	}
+
+	async function handleOpenRecent(id: string) {
+		recentFilesMenuOpen = false;
+		const result = await openRecentFile(id);
+		if (result.success && result.type === 'model') {
+			setTimeout(() => triggerFitView(), 100);
+		} else if (result.error) {
+			consoleStore.error(`[open recent] ${result.error}`);
+		}
+	}
+
+	async function handleRemoveRecent(id: string, e: MouseEvent) {
+		e.stopPropagation();
+		await removeRecentFile(id);
+		recentFiles = await listRecentFiles();
+		if (recentFiles.length === 0) recentFilesMenuOpen = false;
+	}
+
+	function handleRecentMenuBackdropClick() {
+		recentFilesMenuOpen = false;
+	}
+
 	/**
 	 * Expand GitHub shorthand to raw.githubusercontent.com URL
 	 * Format: owner/repo/path/to/file.pvm
@@ -1244,9 +1279,48 @@
 			<button class="toolbar-btn" onclick={handleNew} use:tooltip={"New"} aria-label="New">
 				<Icon name="new-canvas" size={16} />
 			</button>
-			<button class="toolbar-btn" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
-				<Icon name="download" size={16} />
-			</button>
+			<div class="open-group">
+				<button class="toolbar-btn open-main" onclick={handleOpen} use:tooltip={{ text: "Open/Import", shortcut: "Ctrl+O" }} aria-label="Open/Import">
+					<Icon name="download" size={16} />
+				</button>
+				{#if recentFilesSupported}
+					<button
+						class="toolbar-btn open-caret"
+						class:active={recentFilesMenuOpen}
+						onclick={toggleRecentFilesMenu}
+						use:tooltip={"Recent files"}
+						aria-label="Recent files"
+						aria-haspopup="menu"
+						aria-expanded={recentFilesMenuOpen}
+					>
+						<Icon name="chevron-down" size={12} />
+					</button>
+					{#if recentFilesMenuOpen}
+						<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+						<div class="recent-menu-backdrop" onclick={handleRecentMenuBackdropClick}></div>
+						<div class="recent-menu" role="menu">
+							{#if recentFiles.length === 0}
+								<div class="recent-empty">No recent files yet</div>
+							{:else}
+								{#each recentFiles as recent (recent.id)}
+									<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+									<div class="recent-item" role="menuitem" tabindex="0" onclick={() => handleOpenRecent(recent.id)}>
+										<Icon name="file" size={14} />
+										<span class="recent-name" title={recent.name}>{recent.name}</span>
+										<button
+											class="recent-remove"
+											onclick={(e) => handleRemoveRecent(recent.id, e)}
+											aria-label="Remove from recents"
+										>
+											<Icon name="x" size={12} />
+										</button>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				{/if}
+			</div>
 			<button
 				class="toolbar-btn"
 				onclick={() => handleSave()}
@@ -1759,6 +1833,100 @@
 
 	.toolbar-btn.stage-btn {
 		position: relative;
+	}
+
+	/* Open + recent-files caret as a tight pair */
+	.open-group {
+		position: relative;
+		display: flex;
+		gap: 1px;
+	}
+
+	.open-caret {
+		width: 16px;
+		border-radius: var(--radius-md);
+		padding: 0;
+	}
+
+	.recent-menu-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-popover, 1000);
+	}
+
+	.recent-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		min-width: 240px;
+		max-width: 360px;
+		background: var(--surface-raised);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-md, 0 6px 16px rgba(0, 0, 0, 0.25));
+		padding: 4px;
+		z-index: calc(var(--z-popover, 1000) + 1);
+		max-height: 320px;
+		overflow-y: auto;
+	}
+
+	.recent-empty {
+		padding: 8px 10px;
+		font-size: 11px;
+		color: var(--text-muted);
+		text-align: center;
+	}
+
+	.recent-item {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: var(--radius-sm, 4px);
+		cursor: pointer;
+		color: var(--text-muted);
+		font-size: 12px;
+	}
+
+	.recent-item:hover,
+	.recent-item:focus-visible {
+		background: var(--surface);
+		color: var(--text);
+		outline: none;
+	}
+
+	.recent-name {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.recent-remove {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-sm, 4px);
+		opacity: 0;
+		transition: opacity var(--transition-fast), color var(--transition-fast);
+	}
+
+	.recent-item:hover .recent-remove,
+	.recent-item:focus-within .recent-remove {
+		opacity: 1;
+	}
+
+	.recent-remove:hover {
+		color: var(--error);
+		background: color-mix(in srgb, var(--error) 15%, transparent);
 	}
 
 	.mutation-badge {
