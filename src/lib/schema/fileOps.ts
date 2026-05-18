@@ -32,8 +32,9 @@ import { downloadJson } from '$lib/utils/download';
 import { confirmationStore } from '$lib/stores/confirmation';
 import { nodeRegistry } from '$lib/nodes';
 import { NODE_TYPES } from '$lib/constants/nodeTypes';
+import { AUTOSAVE_KEY, kvDelete, kvGet, kvHas, kvSet } from './handleStore';
 
-const STORAGE_KEY = 'pathview_autosave';
+const LEGACY_STORAGE_KEY = 'pathview_autosave';
 const FILE_EXTENSION = '.pvm';
 const LEGACY_EXTENSION = '.json';
 
@@ -318,12 +319,13 @@ export async function loadGraphFile(
 }
 
 /**
- * Save to localStorage (autosave)
+ * Save autosave snapshot to IndexedDB. Async because IDB is async; callers
+ * fire-and-forget unless they need to chain off completion.
  */
-export function autoSave(): void {
+export async function autoSave(): Promise<void> {
 	try {
 		const file = createGraphFile('Autosave');
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(file));
+		await kvSet(AUTOSAVE_KEY, file);
 	} catch (error) {
 		console.warn('Autosave failed:', error);
 	}
@@ -337,24 +339,44 @@ export function debouncedAutoSave(delayMs: number = 500): void {
 		clearTimeout(autosaveDebounceTimer);
 	}
 	autosaveDebounceTimer = setTimeout(() => {
-		autoSave();
+		void autoSave();
 		autosaveDebounceTimer = null;
 	}, delayMs);
 }
 
 /**
- * Load from localStorage (restore autosave)
+ * One-shot migration from the old `localStorage` autosave (key
+ * `pathview_autosave`) to IDB. Runs lazily on the first IDB read/check.
+ */
+async function migrateLegacyAutosave(): Promise<GraphFile | null> {
+	try {
+		const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as GraphFile;
+		if (parsed?.version && parsed?.graph) {
+			await kvSet(AUTOSAVE_KEY, parsed);
+			localStorage.removeItem(LEGACY_STORAGE_KEY);
+			return parsed;
+		}
+		localStorage.removeItem(LEGACY_STORAGE_KEY);
+		return null;
+	} catch {
+		localStorage.removeItem(LEGACY_STORAGE_KEY);
+		return null;
+	}
+}
+
+/**
+ * Load autosave snapshot from IDB (with one-time localStorage migration)
  */
 export async function loadAutoSave(): Promise<boolean> {
 	try {
-		const data = localStorage.getItem(STORAGE_KEY);
-		if (!data) return false;
+		let file = await kvGet<GraphFile>(AUTOSAVE_KEY);
+		if (!file) file = (await migrateLegacyAutosave()) ?? undefined;
+		if (!file) return false;
 
-		const file = JSON.parse(data) as GraphFile;
-
-		// Validate the file has proper structure
 		if (!file.version || !file.graph) {
-			clearAutoSave();
+			await clearAutoSave();
 			return false;
 		}
 
@@ -362,7 +384,7 @@ export async function loadAutoSave(): Promise<boolean> {
 		return true;
 	} catch (error) {
 		console.warn('Failed to restore autosave, clearing:', error);
-		clearAutoSave();
+		await clearAutoSave();
 		return false;
 	}
 }
@@ -370,15 +392,18 @@ export async function loadAutoSave(): Promise<boolean> {
 /**
  * Clear autosave
  */
-export function clearAutoSave(): void {
-	localStorage.removeItem(STORAGE_KEY);
+export async function clearAutoSave(): Promise<void> {
+	await kvDelete(AUTOSAVE_KEY);
+	localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 /**
- * Check if autosave exists
+ * Check if autosave exists (migrates legacy localStorage entry on the way)
  */
-export function hasAutoSave(): boolean {
-	return localStorage.getItem(STORAGE_KEY) !== null;
+export async function hasAutoSave(): Promise<boolean> {
+	if (await kvHas(AUTOSAVE_KEY)) return true;
+	const migrated = await migrateLegacyAutosave();
+	return migrated !== null;
 }
 
 /**
@@ -471,7 +496,7 @@ export function newGraph(): void {
 	consoleStore.clear();
 	settingsStore.reset();
 	historyStore.clear();
-	clearAutoSave();
+	void clearAutoSave();
 	clearCurrentFile();
 }
 
@@ -480,7 +505,9 @@ export function newGraph(): void {
  * Returns cleanup function
  */
 export function setupAutoSave(intervalMs: number = 30000): () => void {
-	const timer = setInterval(autoSave, intervalMs);
+	const timer = setInterval(() => {
+		void autoSave();
+	}, intervalMs);
 	return () => clearInterval(timer);
 }
 

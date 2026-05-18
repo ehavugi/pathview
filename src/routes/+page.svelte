@@ -648,7 +648,7 @@
 		});
 
 		// Always start with clean slate
-		clearAutoSave();
+		void clearAutoSave();
 
 		// Setup periodic autosave (backup)
 		const cleanupAutoSave = setupAutoSave(30000);
