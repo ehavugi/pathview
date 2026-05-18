@@ -526,7 +526,8 @@
 	.port-divider {
 		height: 1px;
 		background: var(--border);
-		margin: 4px 0;
+		/* Extend past the dialog-body padding so the line spans edge-to-edge. */
+		margin: var(--space-xs) calc(-1 * var(--space-md));
 	}
 
 	/* Pin button */
