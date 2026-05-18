@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tooltip } from '$lib/components/Tooltip.svelte';
+	import Icon from '$lib/components/icons/Icon.svelte';
 	import { DIALOG_COLOR_PALETTE, DEFAULT_NODE_COLOR } from '$lib/utils/colors';
 
 	interface Props {
@@ -49,13 +50,9 @@
 
 <div class="color-picker-wrapper" data-tour="block-color-picker">
 	<button class="picker-btn" class:ghost={variant === 'ghost'} onclick={toggle} aria-label="Change color" use:tooltip={{ text: 'Color', position: tooltipPosition }}>
-		<svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke={iconColor || 'currentColor'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-			<circle cx="12" cy="12" r="10"/>
-			<circle cx="8" cy="10" r="1.5" fill={iconColor || 'currentColor'}/>
-			<circle cx="12" cy="7" r="1.5" fill={iconColor || 'currentColor'}/>
-			<circle cx="16" cy="10" r="1.5" fill={iconColor || 'currentColor'}/>
-			<circle cx="15" cy="15" r="2" fill={iconColor || 'currentColor'}/>
-		</svg>
+		<span class="icon-wrap" style={iconColor ? `color: ${iconColor};` : ''}>
+			<Icon name="palette" size={iconSize} />
+		</span>
 	</button>
 	{#if isOpen}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -117,6 +114,10 @@
 	.picker-btn:hover {
 		background: var(--surface-hover);
 		color: var(--text);
+	}
+
+	.icon-wrap {
+		display: inline-flex;
 	}
 
 	/* Ghost variant for annotation nodes - minimal styling */
