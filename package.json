@@ -1,10 +1,6 @@
 {
   "name": "pathview",
-<<<<<<< HEAD
-  "version": "0.14.2-EH",
-=======
-  "version": "0.14.3",
->>>>>>> pathsim/main
+  "version": "0.14.3-EH",
   "private": true,
   "type": "module",
   "scripts": {
