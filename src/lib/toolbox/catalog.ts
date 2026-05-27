@@ -41,6 +41,34 @@ export const TOOLBOX_CATALOG: CatalogEntry[] = [
 		importPath: 'pathsim_chem',
 		defaultCategory: 'Chemical',
 		preloaded: true
+	},
+	{
+		id: 'pathsim-batt',
+		displayName: 'pathsim-batt',
+		source: { type: 'pypi', pkg: 'pathsim-batt' },
+		importPath: 'pathsim_batt',
+		defaultCategory: 'Battery'
+	},
+	{
+		id: 'pathsim-flight',
+		displayName: 'pathsim-flight',
+		source: { type: 'pypi', pkg: 'pathsim-flight' },
+		importPath: 'pathsim_flight',
+		defaultCategory: 'Flight'
+	},
+	{
+		id: 'pathsim-vehicle',
+		displayName: 'pathsim-vehicle',
+		source: { type: 'pypi', pkg: 'pathsim-vehicle' },
+		importPath: 'pathsim_vehicle',
+		defaultCategory: 'Vehicle'
+	},
+	{
+		id: 'pathsim-rf',
+		displayName: 'pathsim-rf',
+		source: { type: 'pypi', pkg: 'pathsim-rf' },
+		importPath: 'pathsim_rf',
+		defaultCategory: 'RF'
 	}
 ];
 
