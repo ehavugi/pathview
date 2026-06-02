@@ -27,12 +27,28 @@ export const CODE_SECTIONS = {
 export const BLOCK_CATEGORY_ORDER: string[] = [
 	'Sources',
 	'Dynamic',
+	'DAE',
 	'Algebraic',
 	'Logic',
 	'Discrete',
+	'FMI',
 	'Recording',
 	'Subsystem'
 ];
+
+/**
+ * Block categories hidden when running on the Pyodide (in-browser) backend,
+ * configurable per distribution via `VITE_PYODIDE_HIDDEN_CATEGORIES`
+ * (comma-separated). Empty by default. Use this for categories whose blocks
+ * can't work in the browser sandbox (e.g. FMI/FMU blocks that drive an external
+ * .fmu through a native runtime) so they're only offered on a native backend.
+ */
+export const PYODIDE_HIDDEN_CATEGORIES: string[] = (
+	(import.meta.env.VITE_PYODIDE_HIDDEN_CATEGORIES as string | undefined) ?? ''
+)
+	.split(',')
+	.map((c) => c.trim())
+	.filter(Boolean);
 
 /**
  * Timeout constants for Pyodide operations (in milliseconds)
