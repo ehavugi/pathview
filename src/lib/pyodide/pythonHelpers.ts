@@ -22,6 +22,16 @@ def _to_json(obj):
         return obj.decode('utf-8', errors='replace')
     return obj
 
+def _block_key(b):
+    """Stable identity for a block, robust across engine wrappers.
+
+    fastsim re-wraps a block on every Rust-to-Python access (e.g.
+    subsystem.blocks), so Python id() is NOT stable; it exposes a stable
+    block_id (the underlying pointer). pathsim has no block_id, so fall back
+    to id(). Keying maps on this keeps subsystem-nested scopes mappable.
+    """
+    return getattr(b, 'block_id', None) or id(b)
+
 def _step_streaming_gen():
     """Step the streaming generator and return result dict."""
     global _sim_streaming, _sim_gen
@@ -65,14 +75,14 @@ def _apply_single_mutation(mut):
         g[mut['var']] = block
         sim.add_block(block)
         blocks.append(block)
-        _node_id_map[id(block)] = mut['nodeId']
+        _node_id_map[_block_key(block)] = mut['nodeId']
         _node_name_map[mut['nodeId']] = mut['nodeName']
 
     elif t == 'remove_block':
         block = g[mut['var']]
         sim.remove_block(block)
         blocks.remove(block)
-        _node_id_map.pop(id(block), None)
+        _node_id_map.pop(_block_key(block), None)
         _node_name_map.pop(mut['nodeId'], None)
 
     elif t == 'add_connection':
@@ -101,8 +111,11 @@ def _extract_scope_data(blocks, node_id_map, incremental=False):
 
     def find_scopes(block_list):
         for block in block_list:
-            block_name = type(block).__name__
-            block_id = node_id_map.get(id(block), str(id(block)))
+            # Prefer the engine's type_name: fastsim blocks are all of Python
+            # type "Block" and carry the real kind in .type_name; pathsim blocks
+            # have no type_name, so fall back to the class name.
+            block_name = getattr(block, 'type_name', None) or type(block).__name__
+            block_id = node_id_map.get(_block_key(block), str(_block_key(block)))
 
             if block_name == 'Scope':
                 try:
@@ -131,8 +144,11 @@ def _extract_spectrum_data(blocks, node_id_map):
 
     def find_spectrums(block_list):
         for block in block_list:
-            block_name = type(block).__name__
-            block_id = node_id_map.get(id(block), str(id(block)))
+            # Prefer the engine's type_name: fastsim blocks are all of Python
+            # type "Block" and carry the real kind in .type_name; pathsim blocks
+            # have no type_name, so fall back to the class name.
+            block_name = getattr(block, 'type_name', None) or type(block).__name__
+            block_id = node_id_map.get(_block_key(block), str(_block_key(block)))
 
             if block_name == 'Spectrum':
                 try:

@@ -11,7 +11,7 @@
  * Request messages (main thread → backend)
  */
 export type REPLRequest =
-	| { type: 'init' }
+	| { type: 'init'; token?: string | null }
 	| { type: 'exec'; id: string; code: string }
 	| { type: 'eval'; id: string; expr: string }
 	| { type: 'stream-start'; id: string; expr: string }
