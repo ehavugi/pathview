@@ -6,6 +6,7 @@
 import { get } from 'svelte/store';
 import type { BackendState, REPLRequest, REPLResponse, REPLErrorResponse } from '../types';
 import { AbstractBackend } from '../abstract';
+import { enginePreInit } from './engineHooks';
 import { backendState } from '../state';
 import { TIMEOUTS } from '$lib/constants/python';
 import { PROGRESS_MESSAGES, STATUS_MESSAGES } from '$lib/constants/messages';
@@ -82,8 +83,10 @@ export class PyodideBackend extends AbstractBackend {
 				}));
 			};
 
-			// Send init message
-			this.sendRequest({ type: 'init' });
+			// Engine pre-init seam (default no-op → null). An alternate engine
+			// can obtain an auth token here before the worker installs it.
+			const token = await enginePreInit();
+			this.sendRequest({ type: 'init', token });
 
 			// Wait for ready
 			await new Promise<void>((resolve, reject) => {
