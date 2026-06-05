@@ -5,6 +5,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { PATHVIEW_VERSION, EXTRACTED_VERSIONS } from '$lib/constants/dependencies';
+	import { BRAND } from '$lib/constants/brand';
 	import { startGuidedTour, type TourId } from '$lib/tours';
 
 	interface Example {
@@ -17,9 +18,10 @@
 	interface Props {
 		onNew: () => void;
 		onClose: () => void;
+		onLoadExample: (url: string) => void;
 	}
 
-	let { onNew, onClose }: Props = $props();
+	let { onNew, onClose, onLoadExample }: Props = $props();
 
 	const examples: Example[] = [
 		{ filename: 'feedback-system.json', basename: 'feedback-system', name: 'Feedback System', description: 'Linear feedback system with delayed step excitation' },
@@ -97,12 +99,12 @@
 
 	<div class="banner-content">
 		<div class="version-info">
-			PathView {PATHVIEW_VERSION} · {Object.entries(EXTRACTED_VERSIONS).map(([pkg, ver]) => `${pkg.replace('_', '-')} ${ver}`).join(' · ')}
+			pathview {PATHVIEW_VERSION} · {Object.entries(EXTRACTED_VERSIONS).map(([pkg, ver]) => `${pkg.replace('_', '-')} ${ver}`).join(' · ')}
 		</div>
 
 		<div class="header">
-			<img src="{base}/pathview_logo.png" alt="PathView" class="logo" />
-			<p class="tagline">Visual block-diagram editor for the PathSim simulation framework</p>
+			<img src="{base}/{BRAND.logo}" alt="{BRAND.name}" class="logo" />
+			<p class="tagline">Visual block-diagram editor for the {BRAND.framework} simulation framework</p>
 		</div>
 
 		<div class="actions">
@@ -111,7 +113,7 @@
 				<span class="action-label">New</span>
 			</button>
 
-			<a href="https://pathsim.org" target="_blank" class="action-card">
+			<a href={BRAND.home} target="_blank" class="action-card">
 				<Icon name="home" size={20} />
 				<span class="action-label">Home</span>
 			</a>
@@ -165,12 +167,11 @@
 		<div class="examples-section">
 			<div class="examples-grid">
 				{#each examples as example}
-					<a
-					class="example-card"
-					href="?model={base}/examples/{example.filename}"
-					data-sveltekit-reload
-					onclick={onClose}
-				>
+					<button
+						type="button"
+						class="example-card"
+						onclick={() => onLoadExample(`${base}/examples/${example.filename}`)}
+					>
 						<div class="example-info">
 							<div class="example-name">{example.name}</div>
 							<div class="example-description">{example.description}</div>
@@ -184,7 +185,7 @@
 								onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
 							/>
 						</div>
-					</a>
+					</button>
 				{/each}
 			</div>
 		</div>

@@ -6,6 +6,7 @@
 import { get } from 'svelte/store';
 import type { BackendState, REPLRequest, REPLResponse, REPLErrorResponse } from '../types';
 import { AbstractBackend } from '../abstract';
+import { enginePreInit } from './engineHooks';
 import { backendState } from '../state';
 import { TIMEOUTS } from '$lib/constants/python';
 import { PROGRESS_MESSAGES, STATUS_MESSAGES } from '$lib/constants/messages';
@@ -32,7 +33,6 @@ interface StreamState {
 export class PyodideBackend extends AbstractBackend {
 	private worker: Worker | null = null;
 	private pendingRequests = new Map<string, PendingRequest>();
-	private isInitializing = false;
 
 	private streamState: StreamState = {
 		id: null,
@@ -65,7 +65,6 @@ export class PyodideBackend extends AbstractBackend {
 			error: null,
 			progress: PROGRESS_MESSAGES.STARTING_WORKER
 		}));
-		this.isInitializing = true;
 
 		try {
 			this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
@@ -82,8 +81,10 @@ export class PyodideBackend extends AbstractBackend {
 				}));
 			};
 
-			// Send init message
-			this.sendRequest({ type: 'init' });
+			// Engine pre-init seam (default no-op → null). An alternate engine
+			// can obtain an auth token here before the worker installs it.
+			const token = await enginePreInit();
+			this.sendRequest({ type: 'init', token });
 
 			// Wait for ready
 			await new Promise<void>((resolve, reject) => {
@@ -288,7 +289,6 @@ export class PyodideBackend extends AbstractBackend {
 					loading: false,
 					progress: STATUS_MESSAGES.READY
 				}));
-				this.isInitializing = false;
 				break;
 
 			case 'progress':
@@ -338,7 +338,8 @@ export class PyodideBackend extends AbstractBackend {
 					try {
 						this.streamState.onData(JSON.parse(response.value));
 					} catch {
-						// Ignore parse errors
+						// Surface (don't silently drop) a corrupt stream frame.
+						this.stderrCallback?.('[stream] dropped an unparseable data frame\n');
 					}
 				}
 				break;

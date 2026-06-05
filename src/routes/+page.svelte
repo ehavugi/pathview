@@ -31,6 +31,7 @@
 	import Icon from '$lib/components/icons/Icon.svelte';
 	import { nodeRegistry } from '$lib/nodes';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
+	import { BRAND } from '$lib/constants/brand';
 	import { PANEL_GAP, PANEL_TOGGLES_WIDTH, MIN_BOTTOM_PANEL_WIDTH, PANEL_DEFAULTS, NAV_HEIGHT } from '$lib/constants/layout';
 	import { GRID_SIZE } from '$lib/constants/grid';
 	import { DEFAULT_SIMULATION_SETTINGS } from '$lib/nodes/types';
@@ -44,9 +45,9 @@
 	import { openNodeDialog } from '$lib/stores/nodeDialog';
 	import { openEventDialog } from '$lib/stores/eventDialog';
 	import type { MenuItemType } from '$lib/components/ContextMenu.svelte';
-	import { pyodideState, simulationState, initPyodide, stopSimulation, continueStreamingSimulation, stageMutations } from '$lib/pyodide/bridge';
+	import { pyodideState, simulationState, initPyodide, stopSimulation, continueStreamingSimulation, stageMutations, resetSimulation } from '$lib/pyodide/bridge';
 	import { pendingMutationCount } from '$lib/pyodide/mutationQueue';
-	import { initBackendFromUrl, autoDetectBackend } from '$lib/pyodide/backend';
+	import { resolveBackend } from '$lib/pyodide/backend';
 	import { runGraphStreamingSimulation, validateGraphSimulation, exportToPython } from '$lib/pyodide/pathsimRunner';
 	import { consoleStore } from '$lib/stores/console';
 	import { newGraph, saveFile, saveAsFile, setupAutoSave, clearAutoSave, debouncedAutoSave, openImportDialog, importFromUrl, currentFileName, loadGraphFile, listRecentFiles, openRecentFile, removeRecentFile } from '$lib/schema/fileOps';
@@ -202,6 +203,11 @@
 	}
 	const urlModelConfig = getUrlModelConfig();
 	let showWelcomeModal = $state(!urlModelConfig); // Hide if loading from URL
+
+	// Backend-ready promise (assigned in onMount). Component-scoped so client-
+	// side example loading can gate its toolbox install on the running worker
+	// instead of forcing a full reload + Pyodide reinit.
+	let backendReady: Promise<unknown> | undefined = $state(undefined);
 
 	// Track widths directly - initialized on first dual-panel open
 	let consolePanelWidth = $state<number | undefined>(undefined);
@@ -554,6 +560,15 @@
 	}
 	let pyodideReady = $state(false);
 	let pyodideLoading = $state(false);
+	// True once startup `bootstrapToolboxes()` has finished (or failed). The
+	// engine wheel being up (`pyodideReady`) is not enough: the bootstrap still
+	// installs the preloaded catalog toolboxes afterwards (and, in engine builds
+	// that resolve dependencies, the engine base + docutils) via micropip. The
+	// run button folds this in so it stays in its loading state until that work
+	// is done, instead of unlocking the moment the wheel is ready.
+	let bootstrapComplete = $state(false);
+	let runLoading = $derived(pyodideLoading || !bootstrapComplete);
+	let runReady = $derived(pyodideReady && bootstrapComplete);
 	let simRunning = $state(false);
 	let isRunStarting = false; // Synchronous flag to prevent race conditions
 	let isContinuing = false; // Synchronous flag to prevent rapid continue calls
@@ -581,15 +596,20 @@
 		// to `registryVersion` bumps, so any (missing) placeholders upgrade
 		// themselves as soon as their toolbox registers.
 		seedPreloadedToolboxes();
-		const backendReady = (async () => {
+		backendReady = (async () => {
 			try {
-				await autoDetectBackend();
-				await initBackendFromUrl();
+				await resolveBackend();
 				await initPyodide();
+				statusText = 'Loading toolboxes...';
 				await bootstrapToolboxes();
+				statusText = 'Ready';
 			} catch (e) {
 				console.error('[startup] backend init failed', e);
 				throw e;
+			} finally {
+				// Unlock the run button even if bootstrap failed — a broken
+				// toolbox shouldn't leave the button stuck in its loading state.
+				bootstrapComplete = true;
 			}
 		})();
 		void loadFromUrlParam(backendReady).catch((e) => {
@@ -729,7 +749,7 @@
 			if (!snapshot || urlModelConfig) return;
 			const ok = await confirmationStore.show({
 				title: 'Restore last session?',
-				message: 'PathView found an autosaved version of your last session. Restore it?',
+				message: `${BRAND.name} found an autosaved version of your last session. Restore it?`,
 				confirmText: 'Restore',
 				cancelText: 'Discard'
 			});
@@ -989,7 +1009,7 @@
 	// Run simulation (auto-initializes if needed)
 	async function handleRun() {
 		// Prevent concurrent simulation runs (synchronous check for rapid key presses)
-		if (simRunning || isRunStarting || pyodideLoading) return;
+		if (simRunning || isRunStarting || runLoading) return;
 
 		// Set flag before any async operations to prevent race conditions
 		isRunStarting = true;
@@ -1231,6 +1251,32 @@
 		}
 	}
 
+	// Load an example/model client-side — no page reload, so the running
+	// Pyodide worker is reused (no reinit). Reflects the model in the URL via
+	// replaceState, so deep-links (?model=) still work and the URL stays
+	// shareable. Used by the welcome modal's example cards.
+	async function loadExample(url: string): Promise<void> {
+		showWelcomeModal = false;
+		// Clear previous results / REPL state; the worker stays up.
+		await resetSimulation();
+		const result = await importFromUrl(url, {
+			deferToolboxInstall: true,
+			backendReady: backendReady ?? Promise.resolve()
+		});
+		if (result.success) {
+			try {
+				history.replaceState(history.state, '', `?model=${encodeURIComponent(url)}`);
+			} catch {
+				/* replaceState can throw in odd embedding contexts; non-fatal */
+			}
+			setTimeout(() => triggerFitView(), 100);
+		} else if (result.error) {
+			consoleStore.error(`Failed to load example: ${url}`);
+			consoleStore.error(result.error);
+			showConsole = true;
+		}
+	}
+
 	// Track placement offset for stacking prevention
 	let placementOffset = 0;
 	let lastPlacementTime = 0;
@@ -1269,14 +1315,14 @@
 <svelte:window onkeydown={handleKeydown} onresize={handleWindowResize} onmousemove={(e) => mousePosition = { x: e.clientX, y: e.clientY }} />
 
 <svelte:head>
-	<title>PathView</title>
+	<title>{BRAND.name}</title>
 	<link rel="icon" type="image/png" href="{base}/favicon.png">
 </svelte:head>
 
 <div class="app">
 	<!-- Logo overlay in top left -->
 	<button class="logo-overlay" onclick={() => showWelcomeModal = true} use:tooltip={"Welcome"} aria-label="Welcome" data-tour="welcome-banner-logo">
-		<img src="{base}/pathview_logo.png" alt="PathView" />
+		<img src="{base}/{BRAND.logo}" alt="{BRAND.name}" />
 	</button>
 
 	<!-- Canvas takes full screen -->
@@ -1299,18 +1345,18 @@
 					<Icon name="stop-filled" size={16} />
 				</button>
 			{:else}
-				<div class="run-btn-wrapper" class:loading={pyodideLoading}>
+				<div class="run-btn-wrapper" class:loading={runLoading}>
 					<button
 						class="toolbar-btn run-btn"
-						class:active={!pyodideLoading}
-						class:loading={pyodideLoading}
+						class:active={!runLoading}
+						class:loading={runLoading}
 						onclick={handleRun}
-						disabled={pyodideLoading}
-						use:tooltip={{ text: pyodideReady ? "Run" : "Initialize & Run", shortcut: "Ctrl+Enter" }}
+						disabled={runLoading}
+						use:tooltip={{ text: runReady ? "Run" : "Initialize & Run", shortcut: "Ctrl+Enter" }}
 						aria-label="Run"
 						data-tour="toolbar-run"
 					>
-						{#if pyodideLoading}
+						{#if runLoading}
 							<span class="loading-status">{statusText}</span>
 							<span class="spinner"><Icon name="loader" size={16} /></span>
 						{:else}
@@ -1321,9 +1367,9 @@
 			{/if}
 			<button
 				class="toolbar-btn"
-				class:active={hasRunSimulation && pyodideReady && !simRunning}
+				class:active={hasRunSimulation && runReady && !simRunning}
 				onclick={handleContinue}
-				disabled={!hasRunSimulation || !pyodideReady || simRunning}
+				disabled={!hasRunSimulation || !runReady || simRunning}
 				use:tooltip={continueTooltip}
 				aria-label="Continue"
 			>
@@ -1851,6 +1897,7 @@
 		<WelcomeModal
 			onNew={handleNew}
 			onClose={() => showWelcomeModal = false}
+			onLoadExample={loadExample}
 		/>
 	{/if}
 </div>

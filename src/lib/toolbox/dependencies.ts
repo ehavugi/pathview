@@ -11,11 +11,26 @@
 import { get } from 'svelte/store';
 import { nodeRegistry, BUILTIN_SOURCE } from '$lib/nodes/registry';
 import { NODE_TYPES } from '$lib/constants/nodeTypes';
+import { ENGINE_MODULE } from '$lib/constants/engine';
 import type { NodeInstance } from '$lib/types/nodes';
 import type { ToolboxRequirement } from '$lib/types/schema';
 import { toolboxes } from './store';
 import { toolboxSourceKey } from './identity';
 import type { ToolboxConfig } from './types';
+
+// The simulation engine itself (pathsim / fastsim) is never a toolbox — it is
+// always present. A stale autosave or a file saved under the other engine can
+// still carry the engine as a `requiredToolbox`; trying to micropip-install it
+// fails ("Invalid wheel filename: 'fastsim'"). Treat these names as reserved
+// and skip them at load time. Real toolboxes (e.g. pathsim-chem -> pkg
+// `pathsim-chem`, importPath `pathsim_chem`) never match these exact names.
+const ENGINE_MODULES = new Set(['pathsim', 'fastsim', ENGINE_MODULE]);
+
+function isEngineRequirement(r: ToolboxRequirement): boolean {
+	const s = (r.source ?? {}) as { pkg?: string; url?: string };
+	const candidates = [r.importPath, r.id, s.pkg, s.url].filter(Boolean).map(String);
+	return candidates.some((c) => ENGINE_MODULES.has(c) || ENGINE_MODULES.has(c.replace(/-/g, '_')));
+}
 
 function walkNodeTypes(nodes: NodeInstance[], out: Set<string>): void {
 	for (const node of nodes) {
@@ -57,7 +72,8 @@ export function collectRequiredToolboxes(nodes: NodeInstance[]): ToolboxRequirem
 		const t = installed.find((tb) => tb.id === id);
 		if (t) result.push(toRequirement(t));
 	}
-	return result;
+	// Never persist the engine itself as a requirement (see isEngineRequirement).
+	return result.filter((r) => !isEngineRequirement(r));
 }
 
 /**
@@ -74,5 +90,5 @@ export function collectRequiredToolboxes(nodes: NodeInstance[]): ToolboxRequirem
 export function findMissingRequirements(reqs: ToolboxRequirement[]): ToolboxRequirement[] {
 	if (!reqs || reqs.length === 0) return [];
 	const installedKeys = new Set(get(toolboxes).map((t) => toolboxSourceKey(t.source)));
-	return reqs.filter((r) => !installedKeys.has(toolboxSourceKey(r.source)));
+	return reqs.filter((r) => !isEngineRequirement(r) && !installedKeys.has(toolboxSourceKey(r.source)));
 }

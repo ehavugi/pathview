@@ -12,6 +12,8 @@ import { NODE_TYPES } from '$lib/constants/nodeTypes';
 import { BLOCK_CATEGORY_ORDER } from '$lib/constants/python';
 import { isSubsystem, isInterface } from '$lib/nodes/shapes';
 import { blockImportPaths } from '$lib/nodes/generated/blocks';
+import { ENGINE_MODULE, enginePath } from '$lib/constants/engine';
+import { generateEngineSetup } from './engineCodegen';
 import { graphStore, findParentSubsystem } from '$lib/stores/graph';
 import {
 	runStreamingSimulation,
@@ -165,8 +167,11 @@ function collectBlockImportGroups(nodes: NodeInstance[]): Map<string, Set<string
 
 		// Toolbox-registered blocks carry their own importPath; built-ins
 		// fall back to the static map. Last fallback is core pathsim.blocks.
-		const importPath =
-			typeDef.importPath ?? blockImportPaths[typeDef.blockClass] ?? 'pathsim.blocks';
+		// enginePath() rewrites core pathsim paths to the active engine module
+		// (identity in the default pathsim build).
+		const importPath = enginePath(
+			typeDef.importPath ?? blockImportPaths[typeDef.blockClass] ?? 'pathsim.blocks'
+		);
 		if (!groups.has(importPath)) groups.set(importPath, new Set());
 		groups.get(importPath)!.add(typeDef.blockClass);
 	}
@@ -395,9 +400,9 @@ export function generatePythonCode(
 	lines.push('# IMPORTS');
 	lines.push('import numpy as np');
 	if (hasSubsystems) {
-		lines.push('from pathsim import Simulation, Connection, Subsystem, Interface');
+		lines.push(`from ${ENGINE_MODULE} import Simulation, Connection, Subsystem, Interface`);
 	} else {
-		lines.push('from pathsim import Simulation, Connection');
+		lines.push(`from ${ENGINE_MODULE} import Simulation, Connection`);
 	}
 	for (const [importPath, classes] of importGroups) {
 		const sorted = [...classes].sort();
@@ -408,14 +413,22 @@ export function generatePythonCode(
 		}
 	}
 	// Ensure at least pathsim.blocks is imported even if no blocks
-	if (!importGroups.has('pathsim.blocks')) {
-		lines.push('from pathsim.blocks import *');
+	if (!importGroups.has(`${ENGINE_MODULE}.blocks`)) {
+		lines.push(`from ${ENGINE_MODULE}.blocks import *`);
 	}
-	lines.push(`from pathsim.solvers import ${getSettingOrDefault(settings, 'solver')}`);
+	lines.push(`from ${ENGINE_MODULE}.solvers import ${getSettingOrDefault(settings, 'solver')}`);
 	if (hasEvents) {
-		lines.push(`from pathsim.events import ${[...eventClasses].join(', ')}`);
+		lines.push(`from ${ENGINE_MODULE}.events import ${[...eventClasses].join(', ')}`);
 	}
 	lines.push('');
+
+	// 1b. Engine-specific setup (e.g. fastsim port() wraps); no-op by default.
+	const engineSetup = generateEngineSetup(importGroups);
+	if (engineSetup) {
+		lines.push(`# ${engineSetup.header}`);
+		lines.push(...engineSetup.lines);
+		lines.push('');
+	}
 
 	// 2. Code context (user-defined variables/functions)
 	if (codeContext.trim()) {
@@ -471,7 +484,10 @@ export function generatePythonCode(
 		lines.push('# NODE ID MAPPING (for data extraction)');
 		lines.push('_node_id_map = {');
 		for (const [nodeId, varName] of nodeVars) {
-			lines.push(`    id(${varName}): "${nodeId}",`);
+			// _block_key (REPL setup) uses the engine's stable block_id when
+			// present and falls back to id(), so static entries here stay
+			// consistent with the mutation-added ones in _apply_mutations.
+			lines.push(`    _block_key(${varName}): "${nodeId}",`);
 		}
 		lines.push('}');
 		lines.push('');
@@ -566,9 +582,9 @@ function generateFormattedPythonCode(
 	lines.push('import matplotlib.pyplot as plt');
 	lines.push('');
 	if (hasSubsystems) {
-		lines.push('from pathsim import Simulation, Connection, Subsystem, Interface');
+		lines.push(`from ${ENGINE_MODULE} import Simulation, Connection, Subsystem, Interface`);
 	} else {
-		lines.push('from pathsim import Simulation, Connection');
+		lines.push(`from ${ENGINE_MODULE} import Simulation, Connection`);
 	}
 
 	// Collect block classes grouped by import path
@@ -589,11 +605,22 @@ function generateFormattedPythonCode(
 		}
 	}
 
-	lines.push(`from pathsim.solvers import ${getSettingOrDefault(settings, 'solver')}`);
+	lines.push(`from ${ENGINE_MODULE}.solvers import ${getSettingOrDefault(settings, 'solver')}`);
 	if (hasEvents) {
-		lines.push(`from pathsim.events import ${[...eventClasses].join(', ')}`);
+		lines.push(`from ${ENGINE_MODULE}.events import ${[...eventClasses].join(', ')}`);
 	}
 	lines.push('');
+
+	// Engine-specific setup (e.g. fastsim port() wraps); no-op by default.
+	const engineSetup = generateEngineSetup(importGroups);
+	if (engineSetup) {
+		lines.push(divider);
+		lines.push(`# ${engineSetup.header}`);
+		lines.push(divider);
+		lines.push('');
+		lines.push(...engineSetup.lines);
+		lines.push('');
+	}
 
 	// Code context (user-defined variables/functions)
 	if (codeContext.trim()) {

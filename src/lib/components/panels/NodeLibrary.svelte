@@ -2,6 +2,8 @@
 	import { onDestroy } from 'svelte';
 	import { nodeRegistry, blockConfig, registryVersion, type NodeCategory, type NodeTypeDefinition } from '$lib/nodes';
 	import { NODE_TYPES } from '$lib/constants/nodeTypes';
+	import { PYODIDE_HIDDEN_CATEGORIES } from '$lib/constants/python';
+	import { getBackendType } from '$lib/pyodide/backend';
 	import { createHoverDetail } from '$lib/actions/hoverDetail.svelte';
 	import NodePreview from '$lib/components/nodes/NodePreview.svelte';
 	import Icon from '$lib/components/icons/Icon.svelte';
@@ -70,6 +72,13 @@
 		// Touch the tick to register the dependency
 		void registryTick;
 		let nodes = nodeRegistry.getAll().filter((node) => node.type !== NODE_TYPES.INTERFACE);
+
+		// Hide backend-incompatible categories (e.g. FMI on the Pyodide backend:
+		// FMU blocks need the native FMI runtime, not available in the browser).
+		if (getBackendType() === 'pyodide' && PYODIDE_HIDDEN_CATEGORIES.length > 0) {
+			const hidden = new Set(PYODIDE_HIDDEN_CATEGORIES);
+			nodes = nodes.filter((node) => !hidden.has(node.category));
+		}
 
 		if (!searchQuery.trim()) return nodes;
 		const query = searchQuery.toLowerCase();

@@ -3,16 +3,12 @@
  * Executes Python code via Pyodide in a separate thread
  */
 
-import {
-	PYODIDE_CDN_URL,
-	PYODIDE_PRELOAD,
-	PYTHON_PACKAGES,
-	type PackageConfig
-} from '$lib/constants/dependencies';
+import { PYODIDE_CDN_URL, PYODIDE_PRELOAD } from '$lib/constants/dependencies';
 import { PROGRESS_MESSAGES, ERROR_MESSAGES } from '$lib/constants/messages';
+import { installEngine } from './engineInstall';
 import type { REPLRequest, REPLResponse } from '../types';
 
-import type { PyodideInterface } from 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.mjs';
+import type { PyodideInterface } from 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/pyodide.mjs';
 
 let pyodide: PyodideInterface | null = null;
 let isInitialized = false;
@@ -29,7 +25,7 @@ function send(response: REPLResponse): void {
 /**
  * Initialize Pyodide and install packages
  */
-async function initialize(): Promise<void> {
+async function initialize(token?: string | null): Promise<void> {
 	if (isInitialized) {
 		send({ type: 'ready' });
 		return;
@@ -56,33 +52,9 @@ async function initialize(): Promise<void> {
 	send({ type: 'progress', value: PROGRESS_MESSAGES.INSTALLING_DEPS });
 	await pyodide.loadPackage([...PYODIDE_PRELOAD]);
 
-	// Install packages from config
-	for (const pkg of PYTHON_PACKAGES) {
-		const progressKey = `INSTALLING_${pkg.import.toUpperCase()}` as keyof typeof PROGRESS_MESSAGES;
-		send({
-			type: 'progress',
-			value: PROGRESS_MESSAGES[progressKey] ?? `Installing ${pkg.import}...`
-		});
-
-		try {
-			const preFlag = pkg.pre ? ', pre=True' : '';
-			await pyodide.runPythonAsync(`
-import micropip
-await micropip.install('${pkg.pip}'${preFlag})
-			`);
-
-			// Verify installation
-			await pyodide.runPythonAsync(`
-import ${pkg.import}
-print(f"${pkg.import} {${pkg.import}.__version__} loaded successfully")
-			`);
-		} catch (error) {
-			if (pkg.required) {
-				throw new Error(`Failed to install required package ${pkg.pip}: ${error}`);
-			}
-			console.warn(`Optional package ${pkg.pip} failed to install:`, error);
-		}
-	}
+	// Install the simulation engine (default: configured PyPI packages). The
+	// engineInstall seam lets an alternate-engine build swap this step.
+	await installEngine(pyodide, { send, token });
 
 	// Import numpy as np and gc globally
 	await pyodide.runPythonAsync(`import numpy as np`);
@@ -236,7 +208,7 @@ self.onmessage = async (event: MessageEvent<REPLRequest>) => {
 	try {
 		switch (type) {
 			case 'init':
-				await initialize();
+				await initialize('token' in event.data ? event.data.token : undefined);
 				break;
 
 			case 'exec':

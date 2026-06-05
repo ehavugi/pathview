@@ -8,15 +8,23 @@
 
 import puppeteer from 'puppeteer-core';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATIC_DIR = join(__dirname, '..', 'static', 'examples');
-const SCREENSHOTS_DIR = join(STATIC_DIR, 'screenshots');
 const MANIFEST_PATH = join(STATIC_DIR, 'manifest.json');
 
-const BASE_URL = 'https://view.pathsim.org';
+// Where to write the PNGs. Override (SCREENSHOT_OUT_DIR) so a fastsim build can
+// capture straight into its build output instead of the default static dir.
+const SCREENSHOTS_DIR = process.env.SCREENSHOT_OUT_DIR
+	? resolve(process.env.SCREENSHOT_OUT_DIR)
+	: join(STATIC_DIR, 'screenshots');
+
+// Origin (+ base path) to screenshot. Defaults to the public blue pathview.
+// The fastsim build points this at a local `vite preview` of the red /app
+// build so the tiles match its styling (SCREENSHOT_BASE_URL=http://localhost:PORT/app).
+const BASE_URL = process.env.SCREENSHOT_BASE_URL || 'https://view.pathsim.org';
 const VIEWPORT = { width: 1000, height: 600 };
 const DEVICE_SCALE_FACTOR = 1;
 const SETTLE_DELAY = 5000;
